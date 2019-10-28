@@ -77,6 +77,7 @@ def handle_connection(conn):
     print("Membership queries processed: {}".format(count_ms))
     print("Probing queries processed: {}".format(count_probe))
 
+
 def start_server():
     s = socket.socket()
     s.bind(('0.0.0.0', 8080))
