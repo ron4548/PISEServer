@@ -127,6 +127,6 @@ class MonitorHook(SimProcedure):
             length = self.state.solver.eval(size)
             buff_addr = self.state.solver.eval(buffer)
 
-            self.inline_call(angr.SIM_PROCEDURES['posix']['read'], fd, buffer, size, 0)
+            self.inline_call(angr.SIM_PROCEDURES['posix']['recv'], fd, buffer, size, 0)
             self.state.monitor.handle_recv(buff_addr, length)
 

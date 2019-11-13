@@ -45,7 +45,7 @@ def handle_probe(m, query_json):
 
 
 def handle_connection(conn):
-    m = monitor.QueryRunner()
+    m = monitor.QueryRunner(file='client')
     count_ms = 0
     count_probe = 0
     while True:

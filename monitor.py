@@ -14,12 +14,12 @@ def match_byte(probing_results, i):
 
 
 class QueryRunner:
-    def __init__(self):
-        self.project = angr.Project('client')
+    def __init__(self, file):
+        self.project = angr.Project(file)
 
     def run_membership_query(self, inputs):
         self.project.hook_symbol('send', membership.MonitorHook(mode='send'))
-        self.project.hook_symbol('read', membership.MonitorHook(mode='read'))
+        self.project.hook_symbol('recv', membership.MonitorHook(mode='read'))
         entry_state = self.project.factory.entry_state()
         entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs))
         sm = self.project.factory.simulation_manager(entry_state)
@@ -37,20 +37,31 @@ class QueryRunner:
 
     def run_probe_query(self, prefix, alphabet):
         self.project.hook_symbol('send', probe.ProbeHook(mode='send'))
-        self.project.hook_symbol('read', probe.ProbeHook(mode='read'))
+        self.project.hook_symbol('recv', probe.ProbeHook(mode='read'))
         entry_state = self.project.factory.entry_state()
         entry_state.register_plugin('probe', probe.ProbeStatePlugin(prefix, alphabet))
         sm = self.project.factory.simulation_manager(entry_state)
-        sm.run(until=lambda simgr: all(map(lambda state: state.probe.done_probing, simgr.active)))
+        sm.run(n=200)
+        # , until=lambda simgr: all(map(lambda state: state.probe.done_probing, simgr.active)))
 
         new_symbols = []
 
         for s in sm.active:
-            new_symbols.append(self.process_new_symbol(s.probe.probing_results, s.probe.probing_result_type))
+            if s.probe.done_probing:
+                temp = self.process_new_symbol(s.probe.probing_results, s.probe.probing_result_type)
+                if temp is not None:
+                    new_symbols.append(temp)
 
         for s in sm.deadended:
             if s.probe.done_probing:
-                new_symbols.append(self.process_new_symbol(s.probe.probing_results, s.probe.probing_result_type))
+                temp = self.process_new_symbol(s.probe.probing_results, s.probe.probing_result_type)
+                if temp is not None:
+                    new_symbols.append(temp)
+            elif s.probe.probing_pending:
+                s.probe.collect_pending_probe()
+                temp = self.process_new_symbol(s.probe.probing_results, s.probe.probing_result_type)
+                if temp is not None:
+                    new_symbols.append(temp)
 
         return new_symbols
 
@@ -63,6 +74,8 @@ class QueryRunner:
                 predicate[str(i)] = probing_results[0][i]
                 if probing_results[0][i] != 0:
                     name = name + chr(probing_results[0][i])
+        if len(predicate) == 0 or len(name) == 0:
+            return None
         return MessageTypeSymbol(probing_result_type, name, predicate)
 
 
