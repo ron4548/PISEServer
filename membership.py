@@ -92,8 +92,9 @@ class MonitorStatePlugin(angr.SimStatePlugin):
                 if offset >= buff_length:
                     continue
 
-                self.state.solver.add(self.state.mem[buff_addr].char.array(buff_length).resolved[offset] == chr(value))
+                self.state.solver.add(self.state.mem[buff_addr].byte.array(buff_length).resolved[offset] == value)
 
+            # print("Membership query SEND position: {} out of {}".format(self.position, len(self.input)))
             self.position = self.position + 1
         else:
             self.state.solver.add(False)
@@ -102,13 +103,17 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         if self.is_done():
             return
 
+        sym_var = self.state.solver.BVS("x", buff_length)
+        self.state.memory.store(buff_addr, sym_var)
+
         if self.input[self.position].type == 'RECEIVE':
             predicate = self.input[self.position].predicate
             for (k, v) in predicate.items():
                 offset = int(k)
                 value = int(v)
-                self.state.solver.add(self.state.mem[buff_addr].char.array(buff_length).resolved[offset] == chr(value))
+                self.state.solver.add(sym_var.get_byte(offset) == value)
 
+            # print("Membership query RECEIVE position: {} out of {}".format(self.position, len(self.input)))
             self.position = self.position + 1
         else:
             self.state.solver.add(False)
@@ -121,12 +126,13 @@ class MonitorHook(SimProcedure):
             length = self.state.solver.eval(size)
             buff_addr = self.state.solver.eval(buffer)
 
-            self.inline_call(angr.SIM_PROCEDURES['posix']['send'], fd, buffer, size, 0)
             self.state.monitor.handle_send(buff_addr, length)
+
+            return 0
         else:
             length = self.state.solver.eval(size)
             buff_addr = self.state.solver.eval(buffer)
 
-            self.inline_call(angr.SIM_PROCEDURES['posix']['recv'], fd, buffer, size, 0)
             self.state.monitor.handle_recv(buff_addr, length)
-
+            return 0
+            # return self.state.solver.BVS("ret", 32)

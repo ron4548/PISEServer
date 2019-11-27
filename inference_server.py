@@ -6,10 +6,14 @@ import monitor
 
 
 class MessageTypeSymbol:
+    id = 0
+
     def __init__(self, type, name, predicate):
         self.predicate = predicate
         self.name = name
         self.type = type.upper()
+        self.id = MessageTypeSymbol.id
+        MessageTypeSymbol.id += 1
 
     def apply_predicate(self, memory):
         pass
@@ -21,7 +25,8 @@ class MessageTypeSymbol:
         return {
             'name': self.name,
             'type': self.type,
-            'predicate': self.predicate
+            'predicate': self.predicate,
+            'id': self.id
         }
 
 
@@ -45,7 +50,8 @@ def handle_probe(m, query_json):
 
 
 def handle_connection(conn):
-    m = monitor.QueryRunner(file='client')
+    m = monitor.QueryRunner(file='smtp/smtp-client')
+    MessageTypeSymbol.id = 0
     count_ms = 0
     count_probe = 0
     while True:
