@@ -61,16 +61,15 @@ def handle_probe(m, query_json):
     return m.run_probe_query(prefix, alphabet)
 
 
-def handle_membership_batch(m, query_json):
-    p = Pool(processes=multiprocessing.cpu_count())
+def handle_membership_batch(m, p, query_json):
     monitors = [m for i in range(len(query_json['queries']))]
     results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries']))
     results = list(results)
-    p.close()
     return results
 
 
 def handle_connection(conn):
+    p = Pool()
     m = monitor.QueryRunner(file='smtp/smtp-client')
     MessageTypeSymbol.id = 0
     count_ms = 0
@@ -103,7 +102,7 @@ def handle_connection(conn):
         elif query_json['type'] == 'membership_batch':
             count_ms += len(query_json['queries'])
             print("Got batch of {} queries".format(len(query_json['queries'])))
-            result = handle_membership_batch(m, query_json)
+            result = handle_membership_batch(m, p, query_json)
             result = b'\n'.join(result) + b'\n'
             conn.send(result)
     print("Connection done.")
