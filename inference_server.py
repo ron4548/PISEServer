@@ -1,6 +1,9 @@
+import multiprocessing
+import os
 import socket
 import json
 from json import JSONEncoder
+from multiprocessing.pool import Pool
 
 import monitor
 
@@ -38,6 +41,15 @@ def handle_membership(m, query_json):
     return m.run_membership_query(inputs)
 
 
+def handle_membership_concurrent(m, query_json):
+    inputs = []
+    for symbol_json in query_json['input']:
+        inputs.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
+
+    print("Running membership query on PID #{}".format(os.getpid()))
+    return m.run_membership_query(inputs)
+
+
 def handle_probe(m, query_json):
     prefix = []
     for symbol_json in query_json['prefix']:
@@ -47,6 +59,15 @@ def handle_probe(m, query_json):
     for symbol_json in query_json['alphabet']:
         alphabet.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
     return m.run_probe_query(prefix, alphabet)
+
+
+def handle_membership_batch(m, query_json):
+    p = Pool(processes=multiprocessing.cpu_count())
+    monitors = [m for i in range(len(query_json['queries']))]
+    results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries']))
+    results = list(results)
+    p.close()
+    return results
 
 
 def handle_connection(conn):
@@ -79,6 +100,12 @@ def handle_connection(conn):
             result_json = json.dumps(result)
             result_json = result_json + '\n'
             conn.send(result_json.encode('utf-8'))
+        elif query_json['type'] == 'membership_batch':
+            count_ms += len(query_json['queries'])
+            print("Got batch of {} queries".format(len(query_json['queries'])))
+            result = handle_membership_batch(m, query_json)
+            result = b'\n'.join(result) + b'\n'
+            conn.send(result)
     print("Connection done.")
     print("Membership queries processed: {}".format(count_ms))
     print("Probing queries processed: {}".format(count_probe))

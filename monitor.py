@@ -1,18 +1,19 @@
 #!/usr/bin/env python
-import copy
-import random
 
 import angr
 import membership
 import probe
 
+
 class QueryRunner:
     def __init__(self, file):
+        self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
+        self.mode = None
+        self.set_membership_hooks()
 
     def run_membership_query(self, inputs):
-        self.project.hook_symbol('smtp_write', membership.MonitorHook(mode='send'))
-        self.project.hook_symbol('smtp_read_aux', membership.MonitorHook(mode='read'))
+        self.set_membership_hooks()
         entry_state = self.project.factory.entry_state()
         entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs))
         sm = self.project.factory.simulation_manager(entry_state)
@@ -24,14 +25,8 @@ class QueryRunner:
 
         return b'False'
 
-        # for _ in sm.monitored:
-        #     return b'True'
-        #
-        # return b'False'
-
     def run_probe_query(self, prefix, alphabet):
-        self.project.hook_symbol('smtp_write', probe.ProbeHook(mode='send'))
-        self.project.hook_symbol('smtp_read_aux', probe.ProbeHook(mode='read'))
+        self.set_probe_hooks()
         entry_state = self.project.factory.entry_state()
         entry_state.register_plugin('probe', probe.ProbeStatePlugin(prefix, alphabet))
         sm = self.project.factory.simulation_manager(entry_state)
@@ -55,6 +50,20 @@ class QueryRunner:
                     new_symbols.append(s.probe.probed_symbol)
 
         return new_symbols
+
+    def set_membership_hooks(self):
+        if self.mode == 'membership':
+            return
+        self.project.hook_symbol('smtp_write', membership.MonitorHook(mode='send'))
+        self.project.hook_symbol('smtp_read_aux', membership.MonitorHook(mode='read'))
+        self.mode = 'membership'
+
+    def set_probe_hooks(self):
+        if self.mode == 'probe':
+            return
+        self.project.hook_symbol('smtp_write', probe.ProbeHook(mode='send'))
+        self.project.hook_symbol('smtp_read_aux', probe.ProbeHook(mode='read'))
+        self.mode = 'probe'
 
 
 
