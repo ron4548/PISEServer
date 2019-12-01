@@ -22,10 +22,15 @@ def extract_predicate(results):
 
 
 def extract_name(predicate):
+    if len(predicate) == 0:
+        return 'ANY'
     name = ''
     for i in sorted(predicate, key=int):
         if chr(predicate[i]).isprintable():
             name += chr(predicate[i])
+
+    if name == '':
+        return 'UNKNOWN'
 
     return name
 
