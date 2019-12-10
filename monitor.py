@@ -12,18 +12,42 @@ class QueryRunner:
         self.mode = None
         self.set_membership_hooks()
 
-    def run_membership_query(self, inputs):
+    def run_membership_query(self, inputs, alphabet):
         self.set_membership_hooks()
         entry_state = self.project.factory.entry_state()
-        entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs))
+        entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs, alphabet))
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
-        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done(), sm.active + sm.deadended)))
+        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)))
         # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
-        if any(map(lambda state: state.monitor.is_done(), sm.active + sm.deadended)):
-            return b'True'
+        if any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)):
+            print('Membership is true - probing....')
 
-        return b'False'
+            # Wait for all states to reach the end of the membership word
+            sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
+
+            # Wait for all states to probe
+            sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)))
+
+            new_symbols = []
+
+            for s in sm.active:
+                if s.monitor.done_probing:
+                    if s.monitor.probed_symbol is not None:
+                        new_symbols.append(s.monitor.probed_symbol)
+
+            for s in sm.deadended:
+                if s.monitor.done_probing:
+                    if s.monitor.probed_symbol is not None:
+                        new_symbols.append(s.monitor.probed_symbol)
+                elif s.monitor.probing_pending:
+                    s.monitor.collect_pending_probe()
+                    if s.monitor.probed_symbol is not None:
+                        new_symbols.append(s.monitor.probed_symbol)
+            # print(new_symbols)
+            return True, new_symbols
+
+        return False, None
 
     def run_probe_query(self, prefix, alphabet):
         self.set_probe_hooks()

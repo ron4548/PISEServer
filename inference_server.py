@@ -32,39 +32,58 @@ class MessageTypeSymbol:
             'id': self.id
         }
 
+    @staticmethod
+    def from_json(symbol_json):
+        return MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate'])
+
 
 def handle_membership(m, query_json):
     inputs = []
     for symbol_json in query_json['input']:
-        inputs.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
+        inputs.append(MessageTypeSymbol.from_json(symbol_json))
 
     return m.run_membership_query(inputs)
 
 
-def handle_membership_concurrent(m, query_json):
+def parse_array_of_symbols(input_json_array):
     inputs = []
-    for symbol_json in query_json['input']:
-        inputs.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
+    for symbol_json in input_json_array:
+        inputs.append(MessageTypeSymbol.from_json(symbol_json))
+
+    return inputs
+
+
+def handle_membership_concurrent(m, query_json, alphabet):
+    inputs = parse_array_of_symbols(query_json['input'])
 
     print("Running membership query on PID #{}".format(os.getpid()))
-    return m.run_membership_query(inputs)
+    answer, probe_result = m.run_membership_query(inputs, alphabet)
+
+    if probe_result is None:
+        symbols = []
+    else:
+        symbols = list(map(lambda o: o.as_json(), probe_result))
+    symbols_json = json.dumps(symbols)
+
+    return {
+        'answer': answer,
+        'probe_result': symbols_json
+    }
 
 
 def handle_probe(m, query_json):
-    prefix = []
-    for symbol_json in query_json['prefix']:
-        prefix.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
-
-    alphabet = []
-    for symbol_json in query_json['alphabet']:
-        alphabet.append(MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate']))
+    prefix = parse_array_of_symbols(query_json['prefix'])
+    alphabet = parse_array_of_symbols(query_json['alphabet'])
     return m.run_probe_query(prefix, alphabet)
 
 
 def handle_membership_batch(m, p, query_json):
     monitors = [m for i in range(len(query_json['queries']))]
-    results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries']))
+    alphabet = parse_array_of_symbols(query_json['alphabet'])
+    alphabets = [alphabet for i in range(len(monitors))]
+    results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries'], alphabets))
     results = list(results)
+    results = json.dumps(results)
     return results
 
 
@@ -103,8 +122,8 @@ def handle_connection(conn):
             count_ms += len(query_json['queries'])
             print("Got batch of {} queries".format(len(query_json['queries'])))
             result = handle_membership_batch(m, p, query_json)
-            result = b'\n'.join(result) + b'\n'
-            conn.send(result)
+            result = result + '\n'
+            conn.send(result.encode('utf-8'))
     print("Connection done.")
     print("Membership queries processed: {}".format(count_ms))
     print("Probing queries processed: {}".format(count_probe))
@@ -118,7 +137,11 @@ def start_server():
         print('Waiting for client...')
         conn, addr = s.accept()
         print('Client connected from ' + str(addr))
-        handle_connection(conn)
+        try:
+            handle_connection(conn)
+        except ConnectionError:
+            conn.close()
+            continue
 
     s.close()
 
