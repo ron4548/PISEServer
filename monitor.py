@@ -14,17 +14,32 @@ class QueryRunner:
 
     def run_membership_query(self, inputs, alphabet):
         self.set_membership_hooks()
-        entry_state = self.project.factory.entry_state()
+        entry_state = self.project.factory.entry_state(add_options={angr.options.LAZY_SOLVES})
         entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs, alphabet))
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
-        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)))
-        # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
-        if any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)):
+
+        cond = lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended))
+        while len(sm.active) > 0 and not cond(sm):
+            sm.run(until=cond(sm), n=18)
+
+            print('Active states [before]: %d' % len(sm.active))
+
+            sm.prune()
+
+            print('Active states [after]: %d' % len(sm.active))
+
+        if cond(sm):
+
             print('Membership is true - probing....')
 
             # Wait for all states to reach the end of the membership word
             sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
+            print(' -> Active states [before]: %d' % len(sm.active))
+            sm.prune()
+            print(' -> Active states [after]: %d' % len(sm.active))
+            for s in sm.active:
+                s.options.remove(angr.options.LAZY_SOLVES)
 
             # Wait for all states to probe
             sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)))

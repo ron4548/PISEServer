@@ -100,6 +100,9 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
             # print("Membership query SEND position: {} out of {}".format(self.position, len(self.input)))
             self.position = self.position + 1
+            
+            # if self.is_done_membership():
+            #     self.state.options.remove(angr.options.LAZY_SOLVES)
         else:
             self.state.solver.add(False)
 
@@ -146,11 +149,19 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
             # print("Membership query RECEIVE position: {} out of {}".format(self.position, len(self.input)))
             self.position = self.position + 1
+            
+            # if self.is_done_membership():
+            #     self.state.options.remove(angr.options.LAZY_SOLVES)
         else:
             self.state.solver.add(False)
 
     def collect_pending_probe(self):
-        results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
+        try:
+            results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
+        except angr.errors.SimUnsatError:
+            self.done_probing = False
+            self.probing_pending = False
+            return
         self.done_probing = True
         self.probing_pending = False
         self.probing_results = results
@@ -185,6 +196,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         name = extract_name(predicate)
         return MessageTypeSymbol(self.probing_result_type, name, predicate)
 
+
 class MonitorHook(SimProcedure):
     def run(self, fd, buffer, size, mode=None):
         if mode == 'send':
@@ -192,13 +204,13 @@ class MonitorHook(SimProcedure):
             length = self.state.solver.eval(size)
             buff_addr = self.state.solver.eval(buffer)
 
-            self.state.monitor.handle_send(buff_addr, length)
+            self.state.monitor.handle_send(buffer, length)
 
             return 0
         else:
             length = self.state.solver.eval(size)
             buff_addr = self.state.solver.eval(buffer)
 
-            self.state.monitor.handle_recv(buff_addr, length)
+            self.state.monitor.handle_recv(buffer, length)
             return 0
             # return self.state.solver.BVS("ret", 32)
