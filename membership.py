@@ -199,6 +199,8 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
 class MonitorHook(SimProcedure):
     def run(self, fd, buffer, size, mode=None):
+        if not self.state.satisfiable():
+            return
         if mode == 'send':
 
             length = self.state.solver.eval(size)
