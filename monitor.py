@@ -3,7 +3,7 @@
 import angr
 import membership
 import probe
-
+import time
 
 class QueryRunner:
     def __init__(self, file):
@@ -18,16 +18,23 @@ class QueryRunner:
         entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs, alphabet))
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
+        t = time.process_time_ns()
+        sm.use_technique(angr.exploration_techniques.dfs.DFS())
         ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)))
+        ms_time = time.process_time_ns() - t
         # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
         if any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)):
             print('Membership is true - probing....')
 
+            t = time.process_time_ns()
             # Wait for all states to reach the end of the membership word
             sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
+            pre_probe_time = time.process_time_ns() - t
 
+            t = time.process_time_ns()
             # Wait for all states to probe
             sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)))
+            probe_time = time.process_time_ns() - t
 
             new_symbols = []
 
@@ -45,9 +52,9 @@ class QueryRunner:
                     if s.monitor.probed_symbol is not None:
                         new_symbols.append(s.monitor.probed_symbol)
             # print(new_symbols)
-            return True, new_symbols
+            return True, new_symbols, ms_time, pre_probe_time, probe_time
 
-        return False, None
+        return False, None, ms_time, None, None
 
     def run_probe_query(self, prefix, alphabet):
         self.set_probe_hooks()

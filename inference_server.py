@@ -57,7 +57,7 @@ def handle_membership_concurrent(m, query_json, alphabet):
     inputs = parse_array_of_symbols(query_json['input'])
 
     print("Running membership query on PID #{}".format(os.getpid()))
-    answer, probe_result = m.run_membership_query(inputs, alphabet)
+    answer, probe_result, ms_time, pre_probe_time, probe_time = m.run_membership_query(inputs, alphabet)
 
     if probe_result is None:
         symbols = []
@@ -66,9 +66,12 @@ def handle_membership_concurrent(m, query_json, alphabet):
     symbols_json = json.dumps(symbols)
 
     return {
+        'membership_time': ms_time,
+        'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
+        'probe_time': probe_time if probe_time is not None else 0,
         'answer': answer,
         'probe_result': symbols_json
-    }
+    }, ms_time, pre_probe_time, probe_time
 
 
 def handle_probe(m, query_json):
@@ -83,8 +86,13 @@ def handle_membership_batch(m, p, query_json):
     alphabets = [alphabet for i in range(len(monitors))]
     results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries'], alphabets))
     results = list(results)
-    results = json.dumps(results)
-    return results
+    ms_time = sum([ms_time for _, ms_time, _, _ in results])
+    pre_probe_time = sum([pre_probe_time for _, _, pre_probe_time, _ in results if pre_probe_time is not None])
+    probe_time = sum([probe_time for _, _, _, probe_time in results if probe_time is not None])
+
+    answers = [ans for ans, _, _, _ in results]
+    results = json.dumps(answers)
+    return results, ms_time, pre_probe_time, probe_time
 
 
 def handle_connection(conn):
@@ -93,6 +101,9 @@ def handle_connection(conn):
     MessageTypeSymbol.id = 0
     count_ms = 0
     count_probe = 0
+    ms_time = 0
+    pre_probe_time = 0
+    probe_time = 0
     while True:
         data = ''
         r = conn.recv(1024)
@@ -122,11 +133,16 @@ def handle_connection(conn):
             count_ms += len(query_json['queries'])
             print("Got batch of {} queries".format(len(query_json['queries'])))
             result = handle_membership_batch(m, p, query_json)
-            result = result + '\n'
+            ms_time += result[1]
+            pre_probe_time += result[2]
+            probe_time += result[3]
+            result = result[0] + '\n'
             conn.send(result.encode('utf-8'))
     print("Connection done.")
     print("Membership queries processed: {}".format(count_ms))
-    print("Probing queries processed: {}".format(count_probe))
+    print("Memberships took: %d" % ms_time)
+    print("Pre-probings took: %d" % pre_probe_time)
+    print("Probing took: %d" % probe_time)
 
 
 def start_server():
