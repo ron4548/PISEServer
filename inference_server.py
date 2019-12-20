@@ -11,18 +11,24 @@ import monitor
 class MessageTypeSymbol:
     id = 0
 
-    def __init__(self, type, name, predicate):
+    def __init__(self, type, name, predicate, symbol_id=None):
         self.predicate = predicate
         self.name = name
         self.type = type.upper()
-        self.id = MessageTypeSymbol.id
-        MessageTypeSymbol.id += 1
+        if symbol_id is None:
+            self.id = MessageTypeSymbol.id
+            MessageTypeSymbol.id += 1
+        else:
+            self.id = symbol_id
 
     def apply_predicate(self, memory):
         pass
 
     def __str__(self):
         return '[{}]: {}'.format(self.type, self.name)
+
+    def __repr__(self):
+        return '[%s]: %s (%d)' % (self.type, self.name, self.id)
 
     def as_json(self):
         return {
@@ -34,7 +40,7 @@ class MessageTypeSymbol:
 
     @staticmethod
     def from_json(symbol_json):
-        return MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate'])
+        return MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate'], symbol_json['id'])
 
 
 def handle_membership(m, query_json):
@@ -66,12 +72,12 @@ def handle_membership_concurrent(m, query_json, alphabet):
     symbols_json = json.dumps(symbols)
 
     return {
-        'membership_time': ms_time,
-        'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
-        'probe_time': probe_time if probe_time is not None else 0,
-        'answer': answer,
-        'probe_result': symbols_json
-    }, ms_time, pre_probe_time, probe_time
+               'membership_time': ms_time,
+               'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
+               'probe_time': probe_time if probe_time is not None else 0,
+               'answer': answer,
+               'probe_result': symbols_json
+           }, ms_time, pre_probe_time, probe_time
 
 
 def handle_probe(m, query_json):
