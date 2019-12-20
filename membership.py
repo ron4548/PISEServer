@@ -185,6 +185,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         name = extract_name(predicate)
         return MessageTypeSymbol(self.probing_result_type, name, predicate)
 
+
 class MonitorHook(SimProcedure):
     def run(self, fd, buffer, size, mode=None):
         if mode == 'send':
