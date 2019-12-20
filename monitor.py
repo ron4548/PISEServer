@@ -9,6 +9,7 @@ class QueryRunner:
     def __init__(self, file):
         self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
+        self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
         self.mode = None
         self.set_membership_hooks()
 
@@ -27,7 +28,8 @@ class QueryRunner:
 
             t = time.process_time_ns()
             # Wait for all states to reach the end of the membership word
-            sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
+            if any(map(lambda state: not state.monitor.is_done_membership(), sm.active)):
+                sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
             pre_probe_time = time.process_time_ns() - t
 
             t = time.process_time_ns()
