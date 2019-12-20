@@ -19,7 +19,6 @@ class QueryRunner:
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
         t = time.process_time_ns()
-        sm.use_technique(angr.exploration_techniques.dfs.DFS())
         ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)))
         ms_time = time.process_time_ns() - t
         # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
