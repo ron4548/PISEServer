@@ -112,6 +112,7 @@ def handle_connection(conn):
     probe_time = 0
     while True:
         data = ''
+        print("Waiting for client to send queries...")
         r = conn.recv(1024)
         if r.decode('utf-8').strip() == 'BYE':
             conn.close()
