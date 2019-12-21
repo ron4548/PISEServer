@@ -145,6 +145,7 @@ def handle_connection(conn):
             probe_time += result[3]
             result = result[0] + '\n'
             conn.send(result.encode('utf-8'))
+    p.close()
     print("Connection done.")
     print("Membership queries processed: {}".format(count_ms))
     print("Memberships took: %d" % ms_time)
