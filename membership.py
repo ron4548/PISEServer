@@ -77,7 +77,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
                     temp = self.state.mem[buff_addr].byte.array(buff_length).resolved[offset] == value
                     symbol_constraint = self.state.solver.And(symbol_constraint, temp)
                 constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
-            self.state.solver.add(constraint)
+            # self.state.solver.add(constraint)
 
             self.probing_symbolic_var = self.state.mem[buff_addr].string.resolved
             results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
@@ -128,7 +128,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
                     temp = sym_var.get_byte(offset) == value
                     symbol_constraint = self.state.solver.And(symbol_constraint, temp)
                 constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
-            self.state.solver.add(constraint)
+            # self.state.solver.add(constraint)
 
             # Wait for constraints to accumulate
             self.probing_pending = True
