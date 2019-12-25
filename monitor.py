@@ -20,7 +20,7 @@ class QueryRunner:
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
         t = time.process_time_ns()
-        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)))
+        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)), selector_func=lambda s: not s.monitor.is_done_membership())
         ms_time = time.process_time_ns() - t
         # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
         if any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)):
@@ -29,12 +29,13 @@ class QueryRunner:
             t = time.process_time_ns()
             # Wait for all states to reach the end of the membership word
             if any(map(lambda state: not state.monitor.is_done_membership(), sm.active)):
-                sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)))
+                sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)), selector_func=lambda s: not s.monitor.is_done_membership())
             pre_probe_time = time.process_time_ns() - t
 
+            print('Done pre-probing....')
             t = time.process_time_ns()
             # Wait for all states to probe
-            sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)))
+            sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)), selector_func=lambda s: not s.monitor.done_probing)
             probe_time = time.process_time_ns() - t
 
             new_symbols = []
