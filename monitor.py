@@ -20,36 +20,35 @@ class QueryRunner:
         sm = self.project.factory.simulation_manager(entry_state)
         # sm.use_technique(angr.exploration_techniques.DFS())
         t = time.process_time_ns()
-        ret = sm.run(until=lambda sm: any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)), selector_func=lambda s: not s.monitor.is_done_membership())
+
+        stashing = lambda sl: 'membership_true' if sl.monitor.is_done_membership() else None
+        ret = sm.run(until=lambda sm: 'membership_true' in sm.stashes.keys() and len(sm.membership_true) > 0, filter_func=stashing)
         ms_time = time.process_time_ns() - t
         # sm.move(from_stash='deadended', to_stash='monitored', filter_func=lambda s: s.monitor.is_done())
-        if any(map(lambda state: state.monitor.is_done_membership(), sm.active + sm.deadended)):
+        if 'membership_true' in sm.stashes.keys() and len(sm.membership_true) > 0:
             print('Membership is true - probing....')
 
             t = time.process_time_ns()
             # Wait for all states to reach the end of the membership word
-            if any(map(lambda state: not state.monitor.is_done_membership(), sm.active)):
-                sm.run(until=lambda sm: all(map(lambda state: state.monitor.is_done_membership(), sm.active)), selector_func=lambda s: not s.monitor.is_done_membership())
+            if len(sm.active) > 0:
+                sm.run(filter_func=stashing)
             pre_probe_time = time.process_time_ns() - t
 
             print('Done pre-probing....')
             t = time.process_time_ns()
             # Wait for all states to probe
-            sm.run(until=lambda sm: all(map(lambda state: state.monitor.done_probing, sm.active)), selector_func=lambda s: not s.monitor.done_probing)
+            sm.run(stash='membership_true', filter_func=lambda sl: 'probing_done' if sl.monitor.done_probing else None)
             probe_time = time.process_time_ns() - t
 
             new_symbols = []
 
-            for s in sm.active:
-                if s.monitor.done_probing:
+            if 'probing_done' in sm.stashes.keys():
+                for s in sm.probing_done:
                     if s.monitor.probed_symbol is not None:
                         new_symbols.append(s.monitor.probed_symbol)
 
             for s in sm.deadended:
-                if s.monitor.done_probing:
-                    if s.monitor.probed_symbol is not None:
-                        new_symbols.append(s.monitor.probed_symbol)
-                elif s.monitor.probing_pending:
+                if s.monitor.probing_pending:
                     s.monitor.collect_pending_probe()
                     if s.monitor.probed_symbol is not None:
                         new_symbols.append(s.monitor.probed_symbol)
