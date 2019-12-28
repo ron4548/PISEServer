@@ -30,6 +30,9 @@ class MessageTypeSymbol:
     def __repr__(self):
         return '[%s]: %s (%d)' % (self.type, self.name, self.id)
 
+    def __eq__(self, other):
+        return self.type == other.type and self.predicate == other.predicate
+
     def as_json(self):
         return {
             'name': self.name,
@@ -68,7 +71,7 @@ def handle_membership_concurrent(m, query_json, alphabet):
     if probe_result is None:
         symbols = []
     else:
-        symbols = list(map(lambda o: o.as_json(), probe_result))
+        symbols = list(map(lambda o: json.dumps([s.as_json() for s in o]), probe_result))
     symbols_json = json.dumps(symbols)
 
     return {

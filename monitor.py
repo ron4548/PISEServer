@@ -9,7 +9,7 @@ class QueryRunner:
     def __init__(self, file):
         self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
-        self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
+        # self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
         self.mode = None
         self.set_membership_hooks()
 
@@ -37,23 +37,23 @@ class QueryRunner:
             print('Done pre-probing....')
             t = time.process_time_ns()
             # Wait for all states to probe
-            sm.run(stash='membership_true', filter_func=lambda sl: 'probing_done' if sl.monitor.done_probing else None)
+            sm.run(stash='membership_true', filter_func=lambda sl: 'probing_done' if sl.monitor.done_probing else None, n=500)
             probe_time = time.process_time_ns() - t
 
-            new_symbols = []
+            possible_suffixes = []
 
-            if 'probing_done' in sm.stashes.keys():
-                for s in sm.probing_done:
-                    if s.monitor.probed_symbol is not None:
-                        new_symbols.append(s.monitor.probed_symbol)
+            # if 'probing_done' in sm.stashes.keys():
+            for s in sm.membership_true:
+                if s.monitor.probed_symbols is not None:
+                    possible_suffixes.append(s.monitor.probed_symbols)
 
-            for s in sm.deadended:
-                if s.monitor.probing_pending:
-                    s.monitor.collect_pending_probe()
-                    if s.monitor.probed_symbol is not None:
-                        new_symbols.append(s.monitor.probed_symbol)
+            # for s in sm.deadended:
+            #     if s.monitor.probing_pending:
+            #         s.monitor.collect_pending_probe()
+            #         if s.monitor.probed_symbol is not None:
+            #             new_symbols.append(s.monitor.probed_symbol)
             # print(new_symbols)
-            return True, new_symbols, ms_time, pre_probe_time, probe_time
+            return True, possible_suffixes, ms_time, pre_probe_time, probe_time
 
         return False, None, ms_time, None, None
 

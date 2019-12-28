@@ -45,7 +45,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         self.probing_results = []
         self.probing_result_type = None
         self.probing_symbolic_var = None
-        self.probed_symbol = None
+        self.probed_symbols = []
 
     @angr.SimStatePlugin.memo
     def copy(self, memo):
@@ -60,31 +60,31 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
         if self.probing_pending:
             self.collect_pending_probe()
-            return
+            # return
 
         if self.is_done_membership():
             # Prevent discovery of known message types
-            constraint = True
-            for symbol in self.alphabet:
-                if symbol.type == 'RECEIVE' or len(symbol.predicate) == 0:
-                    continue
-                symbol_constraint = True
-                for (k, v) in symbol.predicate.items():
-                    offset = int(k)
-                    value = int(v)
-                    if offset >= buff_length:
-                        continue
-                    temp = self.state.mem[buff_addr].byte.array(buff_length).resolved[offset] == value
-                    symbol_constraint = self.state.solver.And(symbol_constraint, temp)
-                constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
+            # constraint = True
+            # for symbol in self.alphabet:
+            #     if symbol.type == 'RECEIVE' or len(symbol.predicate) == 0:
+            #         continue
+            #     symbol_constraint = True
+            #     for (k, v) in symbol.predicate.items():
+            #         offset = int(k)
+            #         value = int(v)
+            #         if offset >= buff_length:
+            #             continue
+            #         temp = self.state.mem[buff_addr].byte.array(buff_length).resolved[offset] == value
+            #         symbol_constraint = self.state.solver.And(symbol_constraint, temp)
+            #     constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
             # self.state.solver.add(constraint)
 
             self.probing_symbolic_var = self.state.mem[buff_addr].string.resolved
             results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
             self.probing_results = results
             self.probing_result_type = 'SEND'
-            self.done_probing = True
-            self.probed_symbol = self.process_new_symbol()
+            # self.done_probing = True
+            self.probed_symbols.append(self.process_new_symbol())
             return
 
         if self.input[self.position].type == 'SEND':
@@ -109,7 +109,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
         if self.probing_pending:
             self.collect_pending_probe()
-            return
+            # return
 
         if self.is_done_membership():
             # Store symbolic value for the recieved message
@@ -117,17 +117,17 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             self.state.memory.store(buff_addr, sym_var)
 
             # Prevent discovery of known message types
-            constraint = True
-            for symbol in self.alphabet:
-                if symbol.type == 'SEND' or len(symbol.predicate) == 0:
-                    continue
-                symbol_constraint = True
-                for (k, v) in symbol.predicate.items():
-                    offset = int(k)
-                    value = int(v)
-                    temp = sym_var.get_byte(offset) == value
-                    symbol_constraint = self.state.solver.And(symbol_constraint, temp)
-                constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
+            # constraint = True
+            # for symbol in self.alphabet:
+            #     if symbol.type == 'SEND' or len(symbol.predicate) == 0:
+            #         continue
+            #     symbol_constraint = True
+            #     for (k, v) in symbol.predicate.items():
+            #         offset = int(k)
+            #         value = int(v)
+            #         temp = sym_var.get_byte(offset) == value
+            #         symbol_constraint = self.state.solver.And(symbol_constraint, temp)
+            #     constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
             # self.state.solver.add(constraint)
 
             # Wait for constraints to accumulate
@@ -151,11 +151,11 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
     def collect_pending_probe(self):
         results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
-        self.done_probing = True
+        # self.done_probing = True
         self.probing_pending = False
         self.probing_results = results
         self.probing_result_type = 'RECEIVE'
-        self.probed_symbol = self.process_new_symbol()
+        self.probed_symbols.append(self.process_new_symbol())
         return
 
     def process_new_symbol(self):
