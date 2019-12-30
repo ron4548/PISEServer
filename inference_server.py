@@ -103,7 +103,7 @@ def handle_membership_batch(m, p, query_json):
 
 def handle_connection(conn):
     p = Pool()
-    m = monitor.QueryRunner(file='smtp/smtp-client')
+    m = monitor.QueryRunner(file='dhcp/dhcp_server')
     MessageTypeSymbol.id = 0
     count_ms = 0
     count_probe = 0

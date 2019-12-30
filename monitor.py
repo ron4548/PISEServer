@@ -9,7 +9,7 @@ class QueryRunner:
     def __init__(self, file):
         self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
-        self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
+        # self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
         self.mode = None
         self.set_membership_hooks()
 
@@ -86,8 +86,8 @@ class QueryRunner:
     def set_membership_hooks(self):
         if self.mode == 'membership':
             return
-        self.project.hook_symbol('smtp_write', membership.MonitorHook(mode='send'))
-        self.project.hook_symbol('smtp_read_aux', membership.MonitorHook(mode='read'))
+        self.project.hook_symbol('sendto', membership.MonitorHook(mode='send'))
+        self.project.hook_symbol('recvfrom', membership.MonitorHook(mode='read'))
         self.mode = 'membership'
 
     def set_probe_hooks(self):
