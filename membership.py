@@ -79,7 +79,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             #     constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
             # self.state.solver.add(constraint)
 
-            self.probing_symbolic_var = self.state.mem[buff_addr].string.resolved
+            self.probing_symbolic_var = self.state.memory.load(buff_addr, buff_length)
             results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
             self.probing_results = results
             self.probing_result_type = 'SEND'
@@ -113,7 +113,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
         if self.is_done_membership():
             # Store symbolic value for the recieved message
-            sym_var = self.state.solver.BVS("x", buff_length)
+            sym_var = self.state.solver.BVS("x", buff_length * 8)
             self.state.memory.store(buff_addr, sym_var)
 
             # Prevent discovery of known message types
@@ -136,7 +136,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             return
 
         if self.input[self.position].type == 'RECEIVE':
-            sym_var = self.state.solver.BVS("x", buff_length)
+            sym_var = self.state.solver.BVS("x", buff_length * 8)
             self.state.memory.store(buff_addr, sym_var)
             predicate = self.input[self.position].predicate
             for (k, v) in predicate.items():
@@ -191,15 +191,15 @@ class MonitorHook(SimProcedure):
         if mode == 'send':
 
             length = self.state.solver.eval(size)
-            buff_addr = self.state.solver.eval(buffer)
+            # buff_addr = self.state.solver.eval(buffer)
 
-            self.state.monitor.handle_send(buff_addr, length)
+            self.state.monitor.handle_send(buffer, length)
 
             return 0
         else:
             length = self.state.solver.eval(size)
-            buff_addr = self.state.solver.eval(buffer)
+            # buff_addr = self.state.solver.eval(buffer)
 
-            self.state.monitor.handle_recv(buff_addr, length)
+            self.state.monitor.handle_recv(buffer, length)
             return 0
             # return self.state.solver.BVS("ret", 32)
