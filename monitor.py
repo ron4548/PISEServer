@@ -37,14 +37,13 @@ class QueryRunner:
             print('Done pre-probing....')
             t = time.process_time_ns()
             # Wait for all states to probe
-            sm.run(stash='membership_true', filter_func=lambda sl: 'probing_done' if sl.monitor.done_probing else None, n=500)
+            sm.run(stash='membership_true', filter_func=lambda sl: 'probing_done' if sl.monitor.done_probing else None)
             probe_time = time.process_time_ns() - t
 
             possible_suffixes = []
 
-            # if 'probing_done' in sm.stashes.keys():
-            for s in sm.membership_true:
-                if s.monitor.probed_symbols is not None:
+            if 'probing_done' in sm.stashes.keys():
+                for s in sm.probing_done:
                     possible_suffixes.append(s.monitor.probed_symbols)
 
             # for s in sm.deadended:

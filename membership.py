@@ -3,8 +3,8 @@ import angr
 from angr import SimProcedure
 from inference_server import MessageTypeSymbol
 
-NUM_SOLUTIONS = 10
-
+NUM_SOLUTIONS = 50
+PROBE_DEPTH = 1
 
 def match_byte(probing_results, i):
     ref = probing_results[0][i]
@@ -85,6 +85,8 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             self.probing_result_type = 'SEND'
             # self.done_probing = True
             self.probed_symbols.append(self.process_new_symbol())
+            if len(self.probed_symbols) == PROBE_DEPTH:
+                self.done_probing = True
             return
 
         if self.input[self.position].type == 'SEND':
@@ -156,6 +158,8 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         self.probing_results = results
         self.probing_result_type = 'RECEIVE'
         self.probed_symbols.append(self.process_new_symbol())
+        if len(self.probed_symbols) == PROBE_DEPTH:
+            self.done_probing = True
         return
 
     def process_new_symbol(self):
