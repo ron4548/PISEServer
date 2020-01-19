@@ -35,10 +35,10 @@ def extract_name(predicate):
 
 class MonitorStatePlugin(angr.SimStatePlugin):
 
-    def __init__(self, query, alphabet):
+    def __init__(self, query, alphabet, initial_position=0):
         super(MonitorStatePlugin, self).__init__()
         self.input = query
-        self.position = 0
+        self.position = initial_position
         self.alphabet = alphabet
         self.probing_pending = False
         self.done_probing = False
@@ -63,21 +63,6 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             return
 
         if self.is_done_membership():
-            # Prevent discovery of known message types
-            constraint = True
-            for symbol in self.alphabet:
-                if symbol.type == 'RECEIVE' or len(symbol.predicate) == 0:
-                    continue
-                symbol_constraint = True
-                for (k, v) in symbol.predicate.items():
-                    offset = int(k)
-                    value = int(v)
-                    if offset >= buff_length:
-                        continue
-                    temp = self.state.mem[buff_addr].byte.array(buff_length).resolved[offset] == value
-                    symbol_constraint = self.state.solver.And(symbol_constraint, temp)
-                constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
-            # self.state.solver.add(constraint)
 
             self.probing_symbolic_var = self.state.memory.load(buff_addr, buff_length)
             results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
@@ -115,20 +100,6 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             # Store symbolic value for the recieved message
             sym_var = self.state.solver.BVS("x", buff_length * 8)
             self.state.memory.store(buff_addr, sym_var)
-
-            # Prevent discovery of known message types
-            constraint = True
-            for symbol in self.alphabet:
-                if symbol.type == 'SEND' or len(symbol.predicate) == 0:
-                    continue
-                symbol_constraint = True
-                for (k, v) in symbol.predicate.items():
-                    offset = int(k)
-                    value = int(v)
-                    temp = sym_var.get_byte(offset) == value
-                    symbol_constraint = self.state.solver.And(symbol_constraint, temp)
-                constraint = self.state.solver.And(constraint, self.state.solver.Not(symbol_constraint))
-            # self.state.solver.add(constraint)
 
             # Wait for constraints to accumulate
             self.probing_pending = True

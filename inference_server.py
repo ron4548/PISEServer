@@ -2,6 +2,7 @@ import multiprocessing
 import os
 import socket
 import json
+from itertools import starmap
 from json import JSONEncoder
 from multiprocessing.pool import Pool
 
@@ -30,6 +31,12 @@ class MessageTypeSymbol:
     def __repr__(self):
         return '[%s]: %s (%d)' % (self.type, self.name, self.id)
 
+    def __eq__(self, other):
+        return self.predicate == other.predicate and self.type == other.type
+
+    def __hash__(self) -> int:
+        return hash(frozenset(self.predicate.items()))
+
     def as_json(self):
         return {
             'name': self.name,
@@ -37,6 +44,9 @@ class MessageTypeSymbol:
             'predicate': self.predicate,
             'id': self.id
         }
+
+    def is_any(self):
+        return len(self.predicate) == 0
 
     @staticmethod
     def from_json(symbol_json):
@@ -63,14 +73,15 @@ def handle_membership_concurrent(m, query_json, alphabet):
     inputs = parse_array_of_symbols(query_json['input'])
 
     print("Running membership query on PID #{}".format(os.getpid()))
-    answer, probe_result, ms_time, pre_probe_time, probe_time = m.run_membership_query(inputs, alphabet)
+    print(inputs)
+    answer, probe_result, ms_time, pre_probe_time, probe_time = m.membership_step_by_step(inputs, alphabet)
 
     if probe_result is None:
         symbols = []
     else:
         symbols = list(map(lambda o: o.as_json(), probe_result))
     symbols_json = json.dumps(symbols)
-
+    print(str(inputs) + " //// " + str(answer))
     return {
                'membership_time': ms_time,
                'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
@@ -90,7 +101,8 @@ def handle_membership_batch(m, p, query_json):
     monitors = [m for i in range(len(query_json['queries']))]
     alphabet = parse_array_of_symbols(query_json['alphabet'])
     alphabets = [alphabet for i in range(len(monitors))]
-    results = p.starmap(handle_membership_concurrent, zip(monitors, query_json['queries'], alphabets))
+    zipped_list = zip(monitors, query_json['queries'], alphabets)
+    results = starmap(handle_membership_concurrent, zipped_list)
     results = list(results)
     ms_time = sum([ms_time for _, ms_time, _, _ in results])
     pre_probe_time = sum([pre_probe_time for _, _, pre_probe_time, _ in results if pre_probe_time is not None])
@@ -102,7 +114,7 @@ def handle_membership_batch(m, p, query_json):
 
 
 def handle_connection(conn):
-    p = Pool()
+    p = Pool(processes=1)
     m = monitor.QueryRunner(file='smtp/smtp-client')
     MessageTypeSymbol.id = 0
     count_ms = 0
