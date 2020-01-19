@@ -35,6 +35,9 @@ def extract_name(predicate):
 
 class MonitorStatePlugin(angr.SimStatePlugin):
 
+    def merge(self, _others, _merge_conditions, _common_ancestor=None):
+        pass
+
     def __init__(self, query, alphabet):
         super(MonitorStatePlugin, self).__init__()
         self.input = query

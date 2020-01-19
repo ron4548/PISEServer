@@ -63,6 +63,7 @@ def handle_membership_concurrent(m, query_json, alphabet):
     inputs = parse_array_of_symbols(query_json['input'])
 
     print("Running membership query on PID #{}".format(os.getpid()))
+    print(inputs)
     answer, probe_result, ms_time, pre_probe_time, probe_time = m.run_membership_query(inputs, alphabet)
 
     if probe_result is None:
