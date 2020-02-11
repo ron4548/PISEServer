@@ -1,9 +1,12 @@
 import copy
+import logging
+
 import angr
 from angr import SimProcedure
 from inference_server import MessageTypeSymbol
 
 NUM_SOLUTIONS = 10
+l = logging.getLogger('inference_server')
 
 
 def match_byte(probing_results, i):
@@ -35,11 +38,10 @@ def extract_name(predicate):
 
 class MonitorStatePlugin(angr.SimStatePlugin):
 
-    def __init__(self, query, alphabet, initial_position=0):
+    def __init__(self, query, initial_position=0):
         super(MonitorStatePlugin, self).__init__()
         self.input = query
         self.position = initial_position
-        self.alphabet = alphabet
         self.probing_pending = False
         self.done_probing = False
         self.probing_results = []
@@ -63,7 +65,6 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             return
 
         if self.is_done_membership():
-
             self.probing_symbolic_var = self.state.memory.load(buff_addr, buff_length)
             results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
             self.probing_results = results
@@ -121,6 +122,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             self.state.solver.add(False)
 
     def collect_pending_probe(self):
+        l.debug('Collecting pending probe')
         results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
         self.done_probing = True
         self.probing_pending = False
@@ -145,32 +147,31 @@ class MonitorStatePlugin(angr.SimStatePlugin):
                                                       cast_to=bytes, extra_constraints=[constraint])
                 self.probing_results += [more_results]
             except Exception as e:
-                print(e)
+                l.debug('Done refining predicate')
             temp = extract_predicate(self.probing_results)
 
             if len(temp) == len(predicate):
                 break
-            print('Refined symbol predicate from {} to {}'.format(len(predicate), len(temp)))
+            l.info('Refined symbol predicate from {} to {}'.format(len(predicate), len(temp)))
             predicate = temp
 
         name = extract_name(predicate)
-        return MessageTypeSymbol(self.probing_result_type, name, predicate)
+        new_symbol = MessageTypeSymbol(self.probing_result_type, name, predicate)
+        l.debug('New symbol discovered: %s' % new_symbol.__str__())
+        return new_symbol
 
 
-class MonitorHook(SimProcedure):
-    def run(self, fd, buffer, size, mode=None):
-        if mode == 'send':
+class RecvHook(SimProcedure):
+    def run(self, _, buffer_arg, length_arg):
+        length = self.state.solver.eval(length_arg)
+        l.debug('Receive hook with %d bytes, buff = %s' % (length, buffer_arg))
+        self.state.monitor.handle_recv(buffer_arg, length)
+        return 0
 
-            length = self.state.solver.eval(size)
-            # buff_addr = self.state.solver.eval(buffer)
 
-            self.state.monitor.handle_send(buffer, length)
-
-            return 0
-        else:
-            length = self.state.solver.eval(size)
-            # buff_addr = self.state.solver.eval(buffer)
-
-            self.state.monitor.handle_recv(buffer, length)
-            return 0
-            # return self.state.solver.BVS("ret", 32)
+class SendHook(SimProcedure):
+    def run(self, _, buffer_arg, length_arg):
+        length = self.state.solver.eval(length_arg)
+        l.debug('Send hook with %d bytes, buff = %s' % (length, buffer_arg))
+        self.state.monitor.handle_send(buffer_arg, length)
+        return 0

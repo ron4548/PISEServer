@@ -1,3 +1,4 @@
+import logging
 import multiprocessing
 import os
 import socket
@@ -7,6 +8,9 @@ from json import JSONEncoder
 from multiprocessing.pool import Pool
 
 import monitor
+
+l = logging.getLogger('inference_server')
+l.setLevel(logging.DEBUG)
 
 
 class MessageTypeSymbol:
@@ -72,16 +76,16 @@ def parse_array_of_symbols(input_json_array):
 def handle_membership_concurrent(m, query_json, alphabet):
     inputs = parse_array_of_symbols(query_json['input'])
 
-    print("Running membership query on PID #{}".format(os.getpid()))
-    print(inputs)
-    answer, probe_result, ms_time, pre_probe_time, probe_time = m.membership_step_by_step(inputs, alphabet)
+    l.info("Running membership query on PID #{}".format(os.getpid()))
+    l.debug("Query inputs: %s" % inputs)
+    answer, probe_result, ms_time, pre_probe_time, probe_time = m.membership_step_by_step(inputs)
 
     if probe_result is None:
         symbols = []
     else:
         symbols = list(map(lambda o: o.as_json(), probe_result))
     symbols_json = json.dumps(symbols)
-    print(str(inputs) + " //// " + str(answer))
+    l.debug(str(inputs) + " //// " + str(answer))
     return {
                'membership_time': ms_time,
                'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
@@ -89,12 +93,6 @@ def handle_membership_concurrent(m, query_json, alphabet):
                'answer': answer,
                'probe_result': symbols_json
            }, ms_time, pre_probe_time, probe_time
-
-
-def handle_probe(m, query_json):
-    prefix = parse_array_of_symbols(query_json['prefix'])
-    alphabet = parse_array_of_symbols(query_json['alphabet'])
-    return m.run_probe_query(prefix, alphabet)
 
 
 def handle_membership_batch(m, p, query_json):
@@ -118,13 +116,12 @@ def handle_connection(conn):
     m = monitor.QueryRunner(file='smtp/smtp-client')
     MessageTypeSymbol.id = 0
     count_ms = 0
-    count_probe = 0
     ms_time = 0
     pre_probe_time = 0
     probe_time = 0
     while True:
         data = ''
-        print("Waiting for client to send queries...")
+        l.info("Waiting for client to send queries...")
         r = conn.recv(1024)
         if r.decode('utf-8').strip() == 'BYE':
             conn.close()
@@ -138,31 +135,23 @@ def handle_connection(conn):
         data = data[:len(data) - 4]
         query_json = json.loads(data)
 
-        if query_json['type'] == 'membership':
-            count_ms += 1
-            result = handle_membership(m, query_json)
-            conn.send(result + b'\n')
-        elif query_json['type'] == 'probe':
-            count_probe += 1
-            result = list(map(lambda o: o.as_json(), handle_probe(m, query_json)))
-            result_json = json.dumps(result)
-            result_json = result_json + '\n'
-            conn.send(result_json.encode('utf-8'))
-        elif query_json['type'] == 'membership_batch':
+        if query_json['type'] == 'membership_batch':
             count_ms += len(query_json['queries'])
-            print("Got batch of {} queries".format(len(query_json['queries'])))
+            l.info("Got batch of {} queries".format(len(query_json['queries'])))
             result = handle_membership_batch(m, p, query_json)
             ms_time += result[1]
             pre_probe_time += result[2]
             probe_time += result[3]
             result = result[0] + '\n'
             conn.send(result.encode('utf-8'))
+        else:
+            l.error('Unknown packet type: %s' % query_json['type'])
     p.close()
-    print("Connection done.")
-    print("Membership queries processed: {}".format(count_ms))
-    print("Memberships took: %d" % ms_time)
-    print("Pre-probings took: %d" % pre_probe_time)
-    print("Probing took: %d" % probe_time)
+    l.info("Connection done.")
+    l.info("Membership queries processed: {}".format(count_ms))
+    l.info("Memberships took: %d" % ms_time)
+    l.info("Pre-probings took: %d" % pre_probe_time)
+    l.info("Probing took: %d" % probe_time)
 
 
 def start_server():
@@ -170,9 +159,9 @@ def start_server():
     s.bind(('0.0.0.0', 8080))
     s.listen()
     while True:
-        print('Waiting for client...')
+        l.info('Waiting for client...')
         conn, addr = s.accept()
-        print('Client connected from ' + str(addr))
+        l.info('Client connected from ' + str(addr))
         try:
             handle_connection(conn)
         except ConnectionError:

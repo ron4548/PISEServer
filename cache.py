@@ -13,7 +13,6 @@ class ProbingCache:
             if len(prefix) < len(word):
                 if list(prefix) == word[:len(prefix)]:
                     if word[len(prefix)] not in conts:
-                        print("%s solved by cache" % str(word))
                         return True
         return None
 
@@ -33,8 +32,6 @@ class SimulationCache:
     def lookup(self, type_ids):
         if self.root is not None:
             length, states = self.root.lookup(type_ids)
-            if states is not None:
-                print("Cache lookup saved %d symbols, %d states retrieved" % (length, len(states)))
             return length, [s.copy() for s in states] if states is not None and len(states) > 0 else None
         else:
             return 0, None
