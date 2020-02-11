@@ -8,61 +8,9 @@ from json import JSONEncoder
 from multiprocessing.pool import Pool
 
 import monitor
+from message_type_symbol import MessageTypeSymbol
 
 l = logging.getLogger('inference_server')
-l.setLevel(logging.DEBUG)
-
-
-class MessageTypeSymbol:
-    id = 0
-
-    def __init__(self, type, name, predicate, symbol_id=None):
-        self.predicate = predicate
-        self.name = name
-        self.type = type.upper()
-        if symbol_id is None:
-            self.id = MessageTypeSymbol.id
-            MessageTypeSymbol.id += 1
-        else:
-            self.id = symbol_id
-
-    def apply_predicate(self, memory):
-        pass
-
-    def __str__(self):
-        return '[{}]: {}'.format(self.type, self.name)
-
-    def __repr__(self):
-        return '[%s]: %s (%d)' % (self.type, self.name, self.id)
-
-    def __eq__(self, other):
-        return self.predicate == other.predicate and self.type == other.type
-
-    def __hash__(self) -> int:
-        return hash(frozenset(self.predicate.items()))
-
-    def as_json(self):
-        return {
-            'name': self.name,
-            'type': self.type,
-            'predicate': self.predicate,
-            'id': self.id
-        }
-
-    def is_any(self):
-        return len(self.predicate) == 0
-
-    @staticmethod
-    def from_json(symbol_json):
-        return MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate'], symbol_json['id'])
-
-
-def handle_membership(m, query_json):
-    inputs = []
-    for symbol_json in query_json['input']:
-        inputs.append(MessageTypeSymbol.from_json(symbol_json))
-
-    return m.run_membership_query(inputs)
 
 
 def parse_array_of_symbols(input_json_array):
@@ -73,103 +21,101 @@ def parse_array_of_symbols(input_json_array):
     return inputs
 
 
-def handle_membership_concurrent(m, query_json, alphabet):
-    inputs = parse_array_of_symbols(query_json['input'])
+class InferenceServer:
+    def __init__(self, binary, hookers, port=8080):
+        self.port = port
+        self.pool = None
+        self.sock = None
+        self.query_runner = monitor.QueryRunner(binary, hookers)
 
-    l.info("Running membership query on PID #{}".format(os.getpid()))
-    l.debug("Query inputs: %s" % inputs)
-    answer, probe_result, ms_time, pre_probe_time, probe_time = m.membership_step_by_step(inputs)
+    def handle_membership_concurrent(self, query_json):
+        inputs = parse_array_of_symbols(query_json['input'])
 
-    if probe_result is None:
-        symbols = []
-    else:
-        symbols = list(map(lambda o: o.as_json(), probe_result))
-    symbols_json = json.dumps(symbols)
-    l.debug(str(inputs) + " //// " + str(answer))
-    return {
-               'membership_time': ms_time,
-               'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
-               'probe_time': probe_time if probe_time is not None else 0,
-               'answer': answer,
-               'probe_result': symbols_json
-           }, ms_time, pre_probe_time, probe_time
+        l.info("Running membership query on PID #{}".format(os.getpid()))
+        l.debug("Query inputs: %s" % inputs)
+        answer, probe_result, ms_time, pre_probe_time, probe_time = self.query_runner.membership_step_by_step(inputs)
 
-
-def handle_membership_batch(m, p, query_json):
-    monitors = [m for i in range(len(query_json['queries']))]
-    alphabet = parse_array_of_symbols(query_json['alphabet'])
-    alphabets = [alphabet for i in range(len(monitors))]
-    zipped_list = zip(monitors, query_json['queries'], alphabets)
-    results = starmap(handle_membership_concurrent, zipped_list)
-    results = list(results)
-    ms_time = sum([ms_time for _, ms_time, _, _ in results])
-    pre_probe_time = sum([pre_probe_time for _, _, pre_probe_time, _ in results if pre_probe_time is not None])
-    probe_time = sum([probe_time for _, _, _, probe_time in results if probe_time is not None])
-
-    answers = [ans for ans, _, _, _ in results]
-    results = json.dumps(answers)
-    return results, ms_time, pre_probe_time, probe_time
-
-
-def handle_connection(conn):
-    p = Pool(processes=1)
-    m = monitor.QueryRunner(file='smtp/smtp-client')
-    MessageTypeSymbol.id = 0
-    count_ms = 0
-    ms_time = 0
-    pre_probe_time = 0
-    probe_time = 0
-    while True:
-        data = ''
-        l.info("Waiting for client to send queries...")
-        r = conn.recv(1024)
-        if r.decode('utf-8').strip() == 'BYE':
-            conn.close()
-            break
-        while True:
-            data += r.decode('utf-8').strip()
-            if data.endswith('DONE'):
-                break
-            r = conn.recv(1024)
-
-        data = data[:len(data) - 4]
-        query_json = json.loads(data)
-
-        if query_json['type'] == 'membership_batch':
-            count_ms += len(query_json['queries'])
-            l.info("Got batch of {} queries".format(len(query_json['queries'])))
-            result = handle_membership_batch(m, p, query_json)
-            ms_time += result[1]
-            pre_probe_time += result[2]
-            probe_time += result[3]
-            result = result[0] + '\n'
-            conn.send(result.encode('utf-8'))
+        if probe_result is None:
+            symbols = []
         else:
-            l.error('Unknown packet type: %s' % query_json['type'])
-    p.close()
-    l.info("Connection done.")
-    l.info("Membership queries processed: {}".format(count_ms))
-    l.info("Memberships took: %d" % ms_time)
-    l.info("Pre-probings took: %d" % pre_probe_time)
-    l.info("Probing took: %d" % probe_time)
+            symbols = list(map(lambda o: o.as_json(), probe_result))
+        symbols_json = json.dumps(symbols)
+        l.debug(str(inputs) + " //// " + str(answer))
+        return {
+                   'membership_time': ms_time,
+                   'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
+                   'probe_time': probe_time if probe_time is not None else 0,
+                   'answer': answer,
+                   'probe_result': symbols_json
+               }, ms_time, pre_probe_time, probe_time
 
+    def handle_membership_batch(self, query_json):
+        zipped_list = zip(query_json['queries'])
+        results = starmap(self.handle_membership_concurrent, zipped_list)
+        results = list(results)
+        ms_time = sum([ms_time for _, ms_time, _, _ in results])
+        pre_probe_time = sum([pre_probe_time for _, _, pre_probe_time, _ in results if pre_probe_time is not None])
+        probe_time = sum([probe_time for _, _, _, probe_time in results if probe_time is not None])
 
-def start_server():
-    s = socket.socket()
-    s.bind(('0.0.0.0', 8080))
-    s.listen()
-    while True:
-        l.info('Waiting for client...')
-        conn, addr = s.accept()
-        l.info('Client connected from ' + str(addr))
-        try:
-            handle_connection(conn)
-        except ConnectionError:
-            conn.close()
-            continue
+        answers = [ans for ans, _, _, _ in results]
+        results = json.dumps(answers)
+        return results, ms_time, pre_probe_time, probe_time
 
-    s.close()
+    def handle_connection(self, conn):
+        self.pool = Pool(processes=1)
+        MessageTypeSymbol.id = 0
+        count_ms = 0
+        ms_time = 0
+        pre_probe_time = 0
+        probe_time = 0
+        while True:
+            data = ''
+            l.info("Waiting for client to send queries...")
+            r = conn.recv(1024)
+            if r.decode('utf-8').strip() == 'BYE':
+                conn.close()
+                break
+            while True:
+                data += r.decode('utf-8').strip()
+                if data.endswith('DONE'):
+                    break
+                r = conn.recv(1024)
 
+            data = data[:len(data) - 4]
+            query_json = json.loads(data)
 
-if __name__ == '__main__':
-    start_server()
+            if query_json['type'] == 'membership_batch':
+                count_ms += len(query_json['queries'])
+                l.info("Got batch of {} queries".format(len(query_json['queries'])))
+                result = self.handle_membership_batch(query_json)
+                ms_time += result[1]
+                pre_probe_time += result[2]
+                probe_time += result[3]
+                result = result[0] + '\n'
+                conn.send(result.encode('utf-8'))
+            else:
+                l.error('Unknown packet type: %s' % query_json['type'])
+        self.pool.close()
+        l.info("Connection done.")
+        l.info("Membership queries processed: {}".format(count_ms))
+        l.info("Memberships took: %d" % ms_time)
+        l.info("Pre-probings took: %d" % pre_probe_time)
+        l.info("Probing took: %d" % probe_time)
+
+    def start(self):
+        s = socket.socket()
+        s.bind(('0.0.0.0', self.port))
+        s.listen()
+        self.sock = s
+        while True:
+            l.info('Waiting for client...')
+            conn, addr = s.accept()
+            l.info('Client connected from ' + str(addr))
+            try:
+                self.handle_connection(conn)
+            except ConnectionError:
+                conn.close()
+                continue
+
+        s.close()
+        self.sock = None

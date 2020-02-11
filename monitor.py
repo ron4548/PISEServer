@@ -4,7 +4,6 @@ import angr
 import logging
 
 import membership
-import probe
 import time
 
 from cache import SimulationCache, ProbingCache
@@ -13,11 +12,11 @@ l = logging.getLogger('inference_server')
 
 
 class QueryRunner:
-    def __init__(self, file):
+    def __init__(self, file, hookers):
         self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
-        self.project.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
         self.mode = None
+        self.hookers = hookers
         self.set_membership_hooks()
         self.cache = SimulationCache()
         self.probing_cache = ProbingCache()
@@ -93,8 +92,8 @@ class QueryRunner:
         if self.mode == 'membership':
             return
         l.info('Setting hooks')
-        self.project.hook_symbol('smtp_write', membership.SendHook())
-        self.project.hook_symbol('smtp_read_aux', membership.RecvHook())
+        for hook in self.hookers:
+            hook.set_hook(self.project)
         self.mode = 'membership'
 
 

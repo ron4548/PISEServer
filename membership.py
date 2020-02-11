@@ -3,7 +3,8 @@ import logging
 
 import angr
 from angr import SimProcedure
-from inference_server import MessageTypeSymbol
+
+from message_type_symbol import MessageTypeSymbol
 
 NUM_SOLUTIONS = 10
 l = logging.getLogger('inference_server')
@@ -162,16 +163,37 @@ class MonitorStatePlugin(angr.SimStatePlugin):
 
 
 class RecvHook(SimProcedure):
-    def run(self, _, buffer_arg, length_arg):
+    def __init__(self, hooker, **kwargs):
+        super().__init__(**kwargs)
+        self.hooker = hooker
+
+    def run(self):
+        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
         length = self.state.solver.eval(length_arg)
         l.debug('Receive hook with %d bytes, buff = %s' % (length, buffer_arg))
         self.state.monitor.handle_recv(buffer_arg, length)
-        return 0
+        return self.hooker.get_return_value(buffer_arg, length_arg)
 
 
 class SendHook(SimProcedure):
-    def run(self, _, buffer_arg, length_arg):
+    def __init__(self, hooker, **kwargs):
+        super().__init__(**kwargs)
+        self.hooker = hooker
+
+    def run(self):
+        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
         length = self.state.solver.eval(length_arg)
         l.debug('Send hook with %d bytes, buff = %s' % (length, buffer_arg))
         self.state.monitor.handle_send(buffer_arg, length)
-        return 0
+        return self.hooker.get_return_value(buffer_arg, length_arg)
+
+
+class Hooker:
+    def set_hook(self, p):
+        raise NotImplementedError()
+
+    def extract_arguments(self, *args):
+        raise  NotImplementedError()
+
+    def get_return_value(self, buffer, length):
+        raise NotImplementedError()
