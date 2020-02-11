@@ -2,7 +2,7 @@ import copy
 import logging
 
 import angr
-from angr import SimProcedure
+from angr import SimProcedure, SimUnsatError
 
 from message_type_symbol import MessageTypeSymbol
 
@@ -146,8 +146,9 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             try:
                 more_results = self.state.solver.eval(self.probing_symbolic_var,
                                                       cast_to=bytes, extra_constraints=[constraint])
+                l.debug(more_results)
                 self.probing_results += [more_results]
-            except Exception as e:
+            except SimUnsatError as e:
                 l.debug('Done refining predicate')
             temp = extract_predicate(self.probing_results)
 
@@ -159,6 +160,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
         name = extract_name(predicate)
         new_symbol = MessageTypeSymbol(self.probing_result_type, name, predicate)
         l.debug('New symbol discovered: %s' % new_symbol.__str__())
+        l.debug('Predicate: %s' % new_symbol.predicate)
         return new_symbol
 
 
