@@ -18,21 +18,13 @@ class MessageTypeSymbol:
         return '[{}]: {}'.format(self.type, self.name)
 
     def __repr__(self):
-        return '[%s]: %s (%d)' % (self.type, self.name, self.id)
+        return '[%s]: %s (ID %d)' % ('⇗' if self.type == 'SEND' else '⇘', self.name, self.id)
 
     def __eq__(self, other):
         return self.predicate == other.predicate and self.type == other.type
 
     def __hash__(self) -> int:
         return hash(frozenset(self.predicate.items()))
-
-    def as_json(self):
-        return {
-            'name': self.name,
-            'type': self.type,
-            'predicate': self.predicate,
-            'id': self.id
-        }
 
     def is_any(self):
         return len(self.predicate) == 0

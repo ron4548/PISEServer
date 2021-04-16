@@ -2,13 +2,11 @@
 
 import angr
 import logging
-
-import membership
 import time
+from pise import membership
+from pise.cache import SimulationCache, ProbingCache
 
-from cache import SimulationCache, ProbingCache
-
-l = logging.getLogger('inference_server')
+logger = logging.getLogger(__name__)
 
 
 class QueryRunner:
@@ -22,29 +20,30 @@ class QueryRunner:
         self.probing_cache = ProbingCache()
 
     def membership_step_by_step(self, inputs):
-        l.info('Performing membership, step by step')
-        l.debug('Query: %s' % inputs)
+        logger.info('Performing membership, step by step')
+        logger.debug('Query: %s' % inputs)
         if self.probing_cache.has_contradiction(inputs):
-            l.info('Query Answered by cache, answer is false')
+            logger.info('Query Answered by cache, answer is false')
             return False, None, 0, None, None
         self.set_membership_hooks()
         cached_prefix, cached_states = self.cache.lookup(inputs)
 
         if cached_states is not None:
-            l.info('Retrieved %d states from cache, covering prefix of %d' % (len(cached_states), cached_prefix))
-            l.debug('States: %s' % cached_states)
+            logger.info('Retrieved %d states from cache, covering prefix of %d' % (len(cached_states), cached_prefix))
+            logger.debug('States: %s' % cached_states)
             for s in cached_states:
                 s.register_plugin('monitor', membership.MonitorStatePlugin(inputs, cached_prefix))
 
             sm = self.project.factory.simulation_manager(cached_states)
         else:
-            l.info('No prefix exists in cache, starting from the beginning')
+            logger.info('No prefix exists in cache, starting from the beginning')
             entry_state = self.project.factory.entry_state(add_options=angr.options.unicorn)
             entry_state.options.add(angr.options.ZERO_FILL_UNCONSTRAINED_MEMORY)
             entry_state.options.add(angr.options.ZERO_FILL_UNCONSTRAINED_REGISTERS)
             entry_state.register_plugin('monitor', membership.MonitorStatePlugin(inputs))
             sm = self.project.factory.simulation_manager(entry_state)
 
+        t = time.process_time_ns()
         sm.move('active', 'position_%d' % cached_prefix)
         # sm.use_technique(angr.exploration_techniques.threading.Threading())
         for i in range(cached_prefix, len(inputs)):
@@ -57,13 +56,13 @@ class QueryRunner:
             sm.run(stash=stash, filter_func=filter_func)
 
             if next_stash in sm.stashes.keys():
-                l.info("Done symbol %d with %d states" % (i, len(getattr(sm, next_stash))))
+                logger.info("Done symbol %d with %d states" % (i, len(getattr(sm, next_stash))))
                 self.cache.store(inputs[:(i+1)], getattr(sm, next_stash))
 
         final_stash = "position_%d" % len(inputs)
-
+        ms_time = time.process_time_ns() - t
         if final_stash in sm.stashes.keys() and len(getattr(sm, final_stash)) > 0:
-            l.info('Membership is true - probing')
+            logger.info('Membership is true - probing')
 
             t = time.process_time_ns()
             # Wait for all states to probe
@@ -84,14 +83,14 @@ class QueryRunner:
                         new_symbols.append(s.monitor.probed_symbol)
             # print(new_symbols)
             self.probing_cache.insert(inputs, new_symbols)
-            return True, new_symbols, 0, 0, probe_time
+            return True, [sym.__dict__ for sym in new_symbols], ms_time, 0, probe_time
 
-        return False, None, 0, None, None
+        return False, None, ms_time, None, None
 
     def set_membership_hooks(self):
         if self.mode == 'membership':
             return
-        l.info('Setting hooks')
+        logger.info('Setting hooks')
         for hook in self.hookers:
             hook.set_hook(self.project)
         self.mode = 'membership'

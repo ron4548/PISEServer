@@ -1,19 +1,15 @@
 import logging
 
-import angr
-
-import membership
-import monitor
-from inference_server import InferenceServer
+from pise import monitor, server, hooks
 
 
-class SendHooker(membership.Hooker):
+class ToySendHook(hooks.Hook):
 
     def get_return_value(self, buff, length):
         return length
 
     def set_hook(self, p):
-        p.hook_symbol('send', membership.SendHook(self))
+        p.hook_symbol('send', hooks.SendHook(self))
 
     def extract_arguments(self, state):
         length = state.regs.edx
@@ -21,21 +17,26 @@ class SendHooker(membership.Hooker):
         return buffer, length
 
 
-class RecvHooker(membership.Hooker):
+class ToyRecvHook(hooks.Hook):
 
     def get_return_value(self, buff, length):
         return length
 
     def set_hook(self, p):
-        p.hook_symbol('recv', membership.RecvHook(self))
+        p.hook_symbol('recv', hooks.RecvHook(self))
 
     def extract_arguments(self, state):
         length = state.regs.edx
         buffer = state.regs.rsi
         return buffer, length
+
+
+def main():
+    logging.getLogger('pise').setLevel(logging.DEBUG)
+    query_runner = monitor.QueryRunner('toy_example', [ToySendHook(), ToyRecvHook()])
+    s = server.Server(query_runner)
+    s.listen()
 
 
 if __name__ == "__main__":
-    logging.getLogger('inference_server').setLevel(logging.DEBUG)
-    inference_server = InferenceServer('client', [SendHooker(), RecvHooker()])
-    inference_server.start()
+    main()

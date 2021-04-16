@@ -1,4 +1,6 @@
-import multiprocessing
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProbingCache:
@@ -60,12 +62,3 @@ class Node:
 
         return recursive_res[0]+1, recursive_res[1] if recursive_res[1] is not None else self.states
 
-
-if __name__ == '__main__':
-    cache = SimulationCache()
-
-    cache.store([2, 2], ['s1'])
-    cache.store([1, 2], ['s2'])
-    cache.store([1, 2, 3], ['s3', 's4'])
-
-    print(cache.lookup([1, 2, 3, 4, 5]))

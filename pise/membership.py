@@ -2,12 +2,12 @@ import copy
 import logging
 
 import angr
-from angr import SimProcedure, SimUnsatError
+from angr import SimUnsatError
 
-from message_type_symbol import MessageTypeSymbol
+from pise.entities import MessageTypeSymbol
 
 NUM_SOLUTIONS = 10
-l = logging.getLogger('inference_server')
+logger = logging.getLogger(__name__)
 
 
 def match_byte(probing_results, i):
@@ -123,7 +123,7 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             self.state.solver.add(False)
 
     def collect_pending_probe(self):
-        l.debug('Collecting pending probe')
+        logger.debug('Collecting pending probe')
         results = self.state.solver.eval_upto(self.probing_symbolic_var, NUM_SOLUTIONS, cast_to=bytes)
         self.done_probing = True
         self.probing_pending = False
@@ -146,56 +146,19 @@ class MonitorStatePlugin(angr.SimStatePlugin):
             try:
                 more_results = self.state.solver.eval(self.probing_symbolic_var,
                                                       cast_to=bytes, extra_constraints=[constraint])
-                l.debug(more_results)
+                logger.debug(more_results)
                 self.probing_results += [more_results]
             except SimUnsatError as e:
-                l.debug('Done refining predicate')
+                logger.debug('Done refining predicate')
             temp = extract_predicate(self.probing_results)
 
             if len(temp) == len(predicate):
                 break
-            l.info('Refined symbol predicate from {} to {}'.format(len(predicate), len(temp)))
+            logger.info('Refined symbol predicate from {} to {}'.format(len(predicate), len(temp)))
             predicate = temp
 
         name = extract_name(predicate)
         new_symbol = MessageTypeSymbol(self.probing_result_type, name, predicate)
-        l.debug('New symbol discovered: %s' % new_symbol.__str__())
-        l.debug('Predicate: %s' % new_symbol.predicate)
+        logger.debug('New symbol discovered: %s' % new_symbol.__str__())
+        logger.debug('Predicate: %s' % new_symbol.predicate)
         return new_symbol
-
-
-class RecvHook(SimProcedure):
-    def __init__(self, hooker, **kwargs):
-        super().__init__(**kwargs)
-        self.hooker = hooker
-
-    def run(self):
-        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
-        length = self.state.solver.eval(length_arg)
-        l.debug('Receive hook with %d bytes, buff = %s' % (length, buffer_arg))
-        self.state.monitor.handle_recv(buffer_arg, length)
-        return self.hooker.get_return_value(buffer_arg, length_arg)
-
-
-class SendHook(SimProcedure):
-    def __init__(self, hooker, **kwargs):
-        super().__init__(**kwargs)
-        self.hooker = hooker
-
-    def run(self):
-        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
-        length = self.state.solver.eval(length_arg)
-        l.debug('Send hook with %d bytes, buff = %s' % (length, buffer_arg))
-        self.state.monitor.handle_send(buffer_arg, length)
-        return self.hooker.get_return_value(buffer_arg, length_arg)
-
-
-class Hooker:
-    def set_hook(self, p):
-        raise NotImplementedError()
-
-    def extract_arguments(self, *args):
-        raise  NotImplementedError()
-
-    def get_return_value(self, buffer, length):
-        raise NotImplementedError()

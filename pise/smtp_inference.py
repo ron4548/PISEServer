@@ -3,8 +3,7 @@ import logging
 import angr
 
 import membership
-import monitor
-from inference_server import InferenceServer
+from pise import InferenceServer
 
 
 class SendHooker(membership.Hooker):
@@ -37,7 +36,7 @@ class RecvHooker(membership.Hooker):
 
 
 if __name__ == "__main__":
-    logging.getLogger('inference_server').setLevel(logging.DEBUG)
+    logging.getLogger('pise').setLevel(logging.DEBUG)
     inference_server = InferenceServer('smtp/smtp-client', [SendHooker(), RecvHooker()])
 
     inference_server.start()
