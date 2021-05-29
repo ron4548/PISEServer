@@ -4,7 +4,7 @@ import socket
 from itertools import starmap
 
 from pise.connection import Connection
-from pise.entities import MessageTypeSymbol
+from pise.entities import MessageTypeSymbol, MembershipQuery, MembershipQueryResult
 from pise.stats import Statistics
 
 logger = logging.getLogger(__name__)
@@ -18,8 +18,8 @@ class Server:
         self.query_runner = query_runner
         self.stats = None
 
-    def handle_membership(self, query_json):
-        inputs = [MessageTypeSymbol.from_json(symbol_json) for symbol_json in query_json['input']]
+    def handle_membership(self, query: MembershipQuery):
+        inputs = query.get_inputs()
 
         logger.info("Running membership query on PID #{}".format(os.getpid()))
         logger.debug("Query inputs: %s" % inputs)
@@ -31,6 +31,7 @@ class Server:
         self.stats.add_probe_time(probe_time)
 
         logger.debug(str(inputs) + " //// " + str(answer))
+        query.set_result(MembershipQueryResult(answer, probe_result))
         return {
                    'membership_time': ms_time,
                    'pre_probe_time': pre_probe_time if pre_probe_time is not None else 0,
@@ -40,11 +41,11 @@ class Server:
                }
 
     def handle_membership_batch(self, query_json):
-        logger.info("Got batch of {} queries".format(len(query_json['queries'])))
-        zipped_list = zip(query_json['queries'])
-        results = starmap(self.handle_membership, zipped_list)
-        results = list(results)
-        return results
+        queries = [MembershipQuery.from_json(query) for query in query_json['queries']]
+        logger.info("Got batch of {} queries".format(len(queries)))
+        for query in queries:
+            self.handle_membership(query)
+        return [query.get_result().as_dict() for query in queries]
 
     def handle_connection(self, client):
         MessageTypeSymbol.id = 0
@@ -74,14 +75,13 @@ class Server:
         self.sock.bind(('0.0.0.0', self.port))
         self.sock.listen()
         try:
-            while True:
-                logger.info('Server is listening...')
-                client_sock, addr = self.sock.accept()
-                logger.info('Client connected from ' + str(addr))
-                client = Connection(client_sock)
-                self.handle_connection(client)
+            # while True:
+            logger.info('Server is listening...')
+            client_sock, addr = self.sock.accept()
+            logger.info('Client connected from ' + str(addr))
+            client = Connection(client_sock)
+            self.handle_connection(client)
         except KeyboardInterrupt:
             logger.info('Server is stopping...')
             pass
-        finally:
-            self.sock.close()
+        self.sock.close()

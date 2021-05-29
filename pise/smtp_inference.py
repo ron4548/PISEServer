@@ -2,17 +2,17 @@ import logging
 
 import angr
 
-import membership
+import sym_ex_helpers
 from pise import InferenceServer
 
 
-class SendHooker(membership.Hooker):
+class SendHooker(sym_ex_helpers.Hooker):
 
     def get_return_value(self, buff, length):
         return 0
 
     def set_hook(self, p):
-        p.hook_symbol('smtp_write', membership.SendHook(self))
+        p.hook_symbol('smtp_write', sym_ex_helpers.SendHook(self))
 
     def extract_arguments(self, state):
         length = state.regs.rdx
@@ -20,13 +20,13 @@ class SendHooker(membership.Hooker):
         return buffer, length
 
 
-class RecvHooker(membership.Hooker):
+class RecvHooker(sym_ex_helpers.Hooker):
 
     def get_return_value(self, buff, length):
         return 0
 
     def set_hook(self, p):
-        p.hook_symbol('smtp_read_aux', membership.RecvHook(self))
+        p.hook_symbol('smtp_read_aux', sym_ex_helpers.RecvHook(self))
         p.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
 
     def extract_arguments(self, state):

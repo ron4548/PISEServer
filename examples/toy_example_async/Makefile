@@ -1,6 +1,6 @@
 CC=gcc
 CFLAGS=-g -Wall
-TARGET=toy_example
+TARGET=toy_example_async
 
 all: $(TARGET)
 

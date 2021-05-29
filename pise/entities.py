@@ -32,3 +32,34 @@ class MessageTypeSymbol:
     @staticmethod
     def from_json(symbol_json):
         return MessageTypeSymbol(symbol_json['type'], symbol_json['name'], symbol_json['predicate'], symbol_json['id'])
+
+
+class MembershipQuery:
+    def __init__(self, inputs):
+        self._inputs = inputs
+        self._result = None
+
+    def get_inputs(self):
+        return self._inputs
+
+    def set_result(self, result):
+        self._result = result
+
+    def get_result(self):
+        return self._result
+
+    @staticmethod
+    def from_json(query_json):
+        return MembershipQuery([MessageTypeSymbol.from_json(sym_json) for sym_json in query_json['input']])
+
+
+class MembershipQueryResult:
+    def __init__(self, answer: bool, probing_result):
+        self._answer = answer
+        self._probe_result = probing_result
+
+    def as_dict(self):
+        return {
+            'answer': self._answer,
+            'probe_result': self._probe_result
+        }

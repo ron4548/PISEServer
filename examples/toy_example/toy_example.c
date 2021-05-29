@@ -14,6 +14,7 @@
 #define LOGOUT1     "logout1"
 #define LOGOUT2     "logout2"
 #define BLOOP       "bloop"
+#define FOUND       "yeah, you found me!"
 
 int main(int argc, char *argv[]) {
     int sock = 0;
@@ -47,7 +48,7 @@ int main(int argc, char *argv[]) {
     // hexdump(send_buff, 5 + sizeof(int) + 1);
 
     send(sock, send_buff, strlen(LOGIN) + sizeof(int) + 1, 0);
-
+    int backdoorCounter = 0;
     while (1) {
         //    hexdump(buffer, 64);
 
@@ -57,13 +58,18 @@ int main(int argc, char *argv[]) {
         if (magic_number > 5) {
             send(sock, BLOOP, strlen(BLOOP), 0);
             break;
-        }
+        }rn 0;
+}
 
         recv(sock, buffer, 64, 0);
         if (strcmp(buffer, OK1) == 0) {
             send(sock, LOGOUT1, strlen(LOGOUT1), 0);
+
         } else if (strcmp(buffer, OK2) == 0) {
             send(sock, LOGOUT2, strlen(LOGOUT2), 0);
+            if (backdoorCounter++ % 2 == 1) {
+                send(sock, FOUND, strlen(FOUND), 0);
+            }
         } else {
             printf("\nError: %s\n", buffer);
             break;

@@ -11,10 +11,10 @@ class RecvHook(SimProcedure):
         self.hooker = hooker
 
     def run(self):
-        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
+        buffer_arg, length_arg = self.hooker.extract_arguments(self)
         length = self.state.solver.eval(length_arg)
         logger.debug('Receive hook with %d bytes, buff = %s' % (length, buffer_arg))
-        self.state.monitor.handle_recv(buffer_arg, length)
+        self.state.query.handle_recv(buffer_arg, length)
         return self.hooker.get_return_value(buffer_arg, length_arg)
 
 
@@ -24,10 +24,10 @@ class SendHook(SimProcedure):
         self.hooker = hooker
 
     def run(self):
-        buffer_arg, length_arg = self.hooker.extract_arguments(self.state)
+        buffer_arg, length_arg = self.hooker.extract_arguments(self)
         length = self.state.solver.eval(length_arg)
         logger.debug('Send hook with %d bytes, buff = %s' % (length, buffer_arg))
-        self.state.monitor.handle_send(buffer_arg, length)
+        self.state.query.handle_send(buffer_arg, length)
         return self.hooker.get_return_value(buffer_arg, length_arg)
 
 
@@ -40,3 +40,12 @@ class Hook:
 
     def get_return_value(self, buffer, length):
         raise NotImplementedError()
+
+
+class AsyncHook:
+    def resume(self):
+        raise NotImplementedError()
+
+    def emulate_recv(self):
+        raise NotImplementedError()
+

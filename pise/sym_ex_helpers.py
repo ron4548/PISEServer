@@ -37,10 +37,10 @@ def extract_name(predicate):
     return name
 
 
-class MonitorStatePlugin(angr.SimStatePlugin):
+class QueryStatePlugin(angr.SimStatePlugin):
 
     def __init__(self, query, initial_position=0):
-        super(MonitorStatePlugin, self).__init__()
+        super(QueryStatePlugin, self).__init__()
         self.input = query
         self.position = initial_position
         self.probing_pending = False
