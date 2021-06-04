@@ -58,8 +58,7 @@ int main(int argc, char *argv[]) {
         if (magic_number > 5) {
             send(sock, BLOOP, strlen(BLOOP), 0);
             break;
-        }rn 0;
-}
+        }
 
         recv(sock, buffer, 64, 0);
         if (strcmp(buffer, OK1) == 0) {
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]) {
 
         } else if (strcmp(buffer, OK2) == 0) {
             send(sock, LOGOUT2, strlen(LOGOUT2), 0);
-            if (backdoorCounter++ % 2 == 1) {
+            if (backdoorCounter++ == 3) {
                 send(sock, FOUND, strlen(FOUND), 0);
             }
         } else {
