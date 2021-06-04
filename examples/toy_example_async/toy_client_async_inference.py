@@ -46,8 +46,8 @@ class RecvHook(SimProcedure):
         super().__init__(**kwargs)
 
     def run(self):
-        buffer_arg = self.state.solver.BVV(0x1337, 64)
-        length = 0x100
+        buffer_arg = self.inline_call(angr.SIM_PROCEDURES['libc']['malloc'], 0x40).ret_expr
+        length = 0x40
         logger.debug('Async recv hook, making up some message')
         self.state.query.handle_recv(buffer_arg, length)
         addr = self.state.project.loader.find_symbol('onMessageReceived').rebased_addr
