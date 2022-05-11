@@ -1,13 +1,13 @@
 import logging
 import angr
+from angr import SimProcedure
 
 from pise import sym_execution, server, hooks
-
 
 class SmtpSendHook(hooks.Hook):
 
     def get_return_value(self, buff, length):
-        return length
+        return 0
 
     def set_hook(self, p):
         p.hook_symbol('smtp_write', hooks.SendHook(self))
@@ -20,16 +20,22 @@ class SmtpSendHook(hooks.Hook):
 
 class SmtpRecvHook(hooks.Hook):
 
-    def get_return_value(self, buff, length):
-        return length
+    def get_return_value(self, buff, length, hooker):
+        hooker.state.mem[hooker.state.regs.rdi + 0x20].uint64_t = 0x13371337
+        strlen = hooker.inline_call(angr.SIM_PROCEDURES['libc']['strlen'], 0x13371337)
+        hooker.state.mem[hooker.state.regs.rdi + 0x28].uint64_t = strlen.ret_expr
+        for i in range(3):
+            hooker.state.solver.add(hooker.state.mem[0x13371337 + i].char.resolved >= 0x30)
+            hooker.state.solver.add(hooker.state.mem[0x13371337 + i].char.resolved <= 0x39)
+        hooker.state.solver.add(hooker.state.mem[0x13371337 + 0x3].char.resolved == ord(' '))
+        return 0
 
     def set_hook(self, p):
-        p.hook_symbol('smtp_read_aux', hooks.RecvHook(self))
-        p.hook_symbol('strtoul', angr.SIM_PROCEDURES['libc']['strtol']())
+        p.hook_symbol('smtp_getline', hooks.RecvHook(self))
 
     def extract_arguments(self, hooker):
-        length = hooker.state.regs.rdx
-        buffer = hooker.state.regs.rsi
+        length = hooker.state.solver.BVV(0x8, 64)
+        buffer = hooker.state.solver.BVV(0x13371337, 64)
         return buffer, length
 
 

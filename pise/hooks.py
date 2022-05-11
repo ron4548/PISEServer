@@ -15,7 +15,7 @@ class RecvHook(SimProcedure):
         length = self.state.solver.eval(length_arg)
         logger.debug('Receive hook with %d bytes, buff = %s' % (length, buffer_arg))
         self.state.query.handle_recv(buffer_arg, length)
-        return self.hooker.get_return_value(buffer_arg, length_arg)
+        return self.hooker.get_return_value(buffer_arg, length_arg, hooker=self)
 
 
 class SendHook(SimProcedure):
@@ -38,7 +38,7 @@ class Hook:
     def extract_arguments(self, *args):
         raise NotImplementedError()
 
-    def get_return_value(self, buffer, length):
+    def get_return_value(self, buffer, length, hooker=None):
         raise NotImplementedError()
 
 
