@@ -47,6 +47,10 @@ class Node:
         self.children = dict()
         self.states = states.copy()
 
+        for state in self.states:
+            state.simplify()
+            state.downsize()
+
     def add_children(self, type_ids, states):
         if len(type_ids) == 1:
             self.children[type_ids[0]] = Node(states)
@@ -55,6 +59,8 @@ class Node:
         # If we store for more than 5 in depth, clean up some memory
         if len(type_ids) > 5 and len(self.states) > 0:
             logger.info('Cleaning up %d states' % len(self.states))
+            for state in self.states:
+                del state
             self.states = []
 
         if type_ids[0] not in self.children:
