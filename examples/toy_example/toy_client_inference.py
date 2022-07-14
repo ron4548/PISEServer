@@ -33,7 +33,7 @@ class ToyRecvHook(hooks.Hook):
 
 def main():
     logging.getLogger('pise').setLevel(logging.DEBUG)
-    query_runner = sym_execution.QueryRunner('toy_example', [ToySendHook(), ToyRecvHook()])
+    query_runner = sym_execution.QueryRunner('examples/toy_example/toy_example', [ToySendHook(), ToyRecvHook()])
     s = server.Server(query_runner)
     s.listen()
 
