@@ -41,7 +41,7 @@ class SmtpRecvHook(hooks.Hook):
 
 def main():
     logging.getLogger('pise').setLevel(logging.DEBUG)
-    query_runner = sym_execution.QueryRunner('smtp_client', [SmtpSendHook(), SmtpRecvHook()])
+    query_runner = sym_execution.QueryRunner('examples/smtp/smtp_client', [SmtpSendHook(), SmtpRecvHook()])
     s = server.Server(query_runner)
     s.listen()
 

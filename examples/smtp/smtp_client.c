@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "smtp.h"
-#define MAIL_SERVER              "ron-pc"
+#define MAIL_SERVER              "pc"
 #define MAIL_PORT                "25"
 #define MAIL_CONNECTION_SECURITY SMTP_SECURITY_NONE
 #define MAIL_FLAGS               (SMTP_DEBUG         | \
@@ -29,10 +29,10 @@ int main(void)
     // fprintf(stderr, "smtp failed: %s\n", smtp_status_code_errstr(rc));
     return 1;
   }
-//  rc = smtp_auth(smtp,
-//                 MAIL_AUTH,
- //                MAIL_USER,
- //                MAIL_PASS);
+ rc = smtp_auth(smtp,
+                MAIL_AUTH,
+                MAIL_USER,
+                MAIL_PASS);
  rc = smtp_address_add(smtp,
                         SMTP_ADDRESS_FROM,
                         MAIL_FROM,

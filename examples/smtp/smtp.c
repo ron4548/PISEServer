@@ -53,13 +53,6 @@
 # include <openssl/x509v3.h>
 #endif /* SMTP_OPENSSL */
 
-#ifndef SIZE_MAX
-/**
- * Maximum value of size_t type.
- */
-# define SIZE_MAX ((size_t)(-1))
-#endif /* SIZE_MAX */
-
 /**
  * Get access to the @ref smtp_result_code and @ref smtp_command definitions.
  */
@@ -528,85 +521,67 @@ smtp_str_getdelimfd_throw_error(struct str_getdelimfd *const gdfd){
  */
 SMTP_LINKAGE enum str_getdelim_retcode
 smtp_str_getdelimfd(struct str_getdelimfd *const gdfd){
-
-  struct smtp *smtp;
+  size_t delim_pos;
   long bytes_read;
+  void *read_buf_ptr;
+  char *buf_new;
+  size_t buf_sz_remaining;
+  size_t buf_sz_new;
 
-  smtp = gdfd->user_data;
-
-  gdfd->line = calloc(1024, 1);
-  int count = 0;
-  char c;
-  while (recv(smtp->sock, &c, 1, 0) == 1){
-    if (c == '\r') break;
-    gdfd->line[count++] = c;
+  if(gdfd->getdelimfd_read == NULL){
+    return STRING_GETDELIMFD_ERROR;
   }
-  recv(smtp->sock, &c, 1, 0);
-  gdfd->line[count] = 0;
-  gdfd->line_len = count+1;
-  // printf("Read %d bytes:\n%s\n", (int)gdfd->line_len, gdfd->line);
 
-  // size_t delim_pos;
-  // long bytes_read;
-  // void *read_buf_ptr;
-  // char *buf_new;
-  // size_t buf_sz_remaining;
-  // size_t buf_sz_new;
+  bytes_read = -1;
 
-  // if(gdfd->getdelimfd_read == NULL){
-  //   return STRING_GETDELIMFD_ERROR;
-  
+  while(1){
+    if(smtp_str_getdelimfd_search_delim(gdfd->_buf,
+                                        gdfd->_buf_len,
+                                        gdfd->delim,
+                                        &delim_pos)){
+      if(smtp_str_getdelimfd_set_line_and_buf(gdfd, delim_pos) < 0){
+        return smtp_str_getdelimfd_throw_error(gdfd);
+      }
+      return STRING_GETDELIMFD_NEXT;
+    }else if(bytes_read == 0){
+      if(smtp_str_getdelimfd_set_line_and_buf(gdfd, gdfd->_buf_len) < 0){
+        return smtp_str_getdelimfd_throw_error(gdfd);
+      }
+      return STRING_GETDELIMFD_DONE;
+    }
 
-  // bytes_read = -1;
+    if(smtp_si_sub_size_t(gdfd->_bufsz, gdfd->_buf_len, &buf_sz_remaining)){
+      return smtp_str_getdelimfd_throw_error(gdfd);
+    }
 
-  // while(1){
-  //   if(smtp_str_getdelimfd_search_delim(gdfd->_buf,
-  //                                       gdfd->_buf_len,
-  //                                       gdfd->delim,
-  //                                       &delim_pos)){
-  //     if(smtp_str_getdelimfd_set_line_and_buf(gdfd, delim_pos) < 0){
-  //       return smtp_str_getdelimfd_throw_error(gdfd);
-  //     }
-  //     return STRING_GETDELIMFD_NEXT;
-  //   }else if(bytes_read == 0){
-  //     if(smtp_str_getdelimfd_set_line_and_buf(gdfd, gdfd->_buf_len) < 0){
-  //       return smtp_str_getdelimfd_throw_error(gdfd);
-  //     }
-  //     return STRING_GETDELIMFD_DONE;
-  //   }
+    if(buf_sz_remaining < SMTP_GETDELIM_READ_SZ){
+      if(smtp_si_add_size_t(buf_sz_remaining,
+                            SMTP_GETDELIM_READ_SZ,
+                            &buf_sz_new)){
+        return smtp_str_getdelimfd_throw_error(gdfd);
+      }
+      buf_new = realloc(gdfd->_buf, buf_sz_new);
+      if(buf_new == NULL){
+        return smtp_str_getdelimfd_throw_error(gdfd);
+      }
+      gdfd->_buf = buf_new;
+      gdfd->_bufsz = buf_sz_new;
+    }
 
-  //   if(smtp_si_sub_size_t(gdfd->_bufsz, gdfd->_buf_len, &buf_sz_remaining)){
-  //     return smtp_str_getdelimfd_throw_error(gdfd);
-  //   }
-
-  //   if(buf_sz_remaining < SMTP_GETDELIM_READ_SZ){
-  //     if(smtp_si_add_size_t(buf_sz_remaining,
-  //                           SMTP_GETDELIM_READ_SZ,
-  //                           &buf_sz_new)){
-  //       return smtp_str_getdelimfd_throw_error(gdfd);
-  //     }
-  //     buf_new = realloc(gdfd->_buf, buf_sz_new);
-  //     if(buf_new == NULL){
-  //       return smtp_str_getdelimfd_throw_error(gdfd);
-  //     }
-  //     gdfd->_buf = buf_new;
-  //     gdfd->_bufsz = buf_sz_new;
-  //   }
-
-  //   if(smtp_si_add_size_t((size_t)gdfd->_buf, gdfd->_buf_len, NULL)){
-  //     return smtp_str_getdelimfd_throw_error(gdfd);
-  //   }
-  //   read_buf_ptr = gdfd->_buf + gdfd->_buf_len;
-  //   bytes_read = (*gdfd->getdelimfd_read)(gdfd,
-  //                                         read_buf_ptr,
-  //                                         SMTP_GETDELIM_READ_SZ);
-  //   if(bytes_read < 0 ||
-  //      smtp_si_add_size_t(gdfd->_buf_len,
-  //                         (size_t)bytes_read,
-  //                         &gdfd->_buf_len)){
-  //     return smtp_str_getdelimfd_throw_error(gdfd);
-  //   }
-  // }
+    if(smtp_si_add_size_t((size_t)gdfd->_buf, gdfd->_buf_len, NULL)){
+      return smtp_str_getdelimfd_throw_error(gdfd);
+    }
+    read_buf_ptr = gdfd->_buf + gdfd->_buf_len;
+    bytes_read = (*gdfd->getdelimfd_read)(gdfd,
+                                          read_buf_ptr,
+                                          SMTP_GETDELIM_READ_SZ);
+    if(bytes_read < 0 ||
+       smtp_si_add_size_t(gdfd->_buf_len,
+                          (size_t)bytes_read,
+                          &gdfd->_buf_len)){
+      return smtp_str_getdelimfd_throw_error(gdfd);
+    }
+  }
 }
 
 /**
@@ -1466,7 +1441,7 @@ smtp_file_get_contents(const char *const filename,
   FILE *fp;
   char *read_buf;
 
-  if((fp = fopen(filename, "r")) == NULL){
+  if((fp = fopen(filename, "rb")) == NULL){
     return NULL;
   }
 
@@ -1537,38 +1512,26 @@ static void
 smtp_puts_dbg(struct smtp *const smtp,
               const char *const prefix,
               const char *const str){
-  // char *sdup;
-  // size_t i;
+  char *sdup;
+  size_t i;
 
-  // if(smtp->flags & SMTP_DEBUG){
-  //   if((sdup = smtp_strdup(str)) == NULL){
-  //     return;
-  //   }
+  if(smtp->flags & SMTP_DEBUG){
+    if((sdup = smtp_strdup(str)) == NULL){
+      return;
+    }
 
-  //   /* Remove carriage return and newline when printing to stderr. */
-  //   for(i = 0; sdup[i]; i++){
-  //     if(sdup[i] == '\r' || sdup[i] == '\n'){
-  //       sdup[i] = ' ';
-  //     }
-  //   }
+    /* Remove carriage return and newline when printing to stderr. */
+    for(i = 0; sdup[i]; i++){
+      if(sdup[i] == '\r' || sdup[i] == '\n'){
+        sdup[i] = ' ';
+      }
+    }
 
-  //   if(fprintf(stderr, "[smtp %s]: %s\n", prefix, sdup) < 0){
-  //     /* Do not care if this fails. */
-  //   }
-  //   free(sdup);
-  // }
-}
-
-enum str_getdelim_retcode smtp_read_aux(int sock, char* buff, int size) {
-  int count = 0;
-  char c;
-  while (recv(sock, &c, 1, 0) == 1){
-    buff[count++] = c;
-    if (c == '\r') break;
+    if(fprintf(stderr, "[smtp %s]: %s\n", prefix, sdup) < 0){
+      /* Do not care if this fails. */
+    }
+    free(sdup);
   }
-  recv(sock, &c, 1, 0);
-  buff[count] = '\0';
-  return 0;
 }
 
 /**
@@ -1577,16 +1540,12 @@ enum str_getdelim_retcode smtp_read_aux(int sock, char* buff, int size) {
  * @param[in] smtp SMTP client context.
  * @return See @ref str_getdelim_retcode.
  */
-#define BUFF_SIZE 8
-
 static enum str_getdelim_retcode
 smtp_getline(struct smtp *const smtp){
   enum str_getdelim_retcode rc;
 
   errno = 0;
-  smtp->gdfd.line = calloc(BUFF_SIZE, sizeof(char));
-  rc = smtp_read_aux(smtp->sock, smtp->gdfd.line, BUFF_SIZE);
-  smtp->gdfd.line_len = strlen(smtp->gdfd.line);
+  rc = smtp_str_getdelimfd(&smtp->gdfd);
   if(errno == ENOMEM){
     smtp_status_code_set(smtp, SMTP_STATUS_NOMEM);
     return rc;
@@ -1746,7 +1705,7 @@ smtp_connect(struct smtp *const smtp,
              const char *const port){
   struct addrinfo hints;
   struct addrinfo *res0;
-  struct addrinfo *res;
+  // struct addrinfo *res;
 
   /*
    * Windows requires initializing the socket library before we call any
@@ -1808,7 +1767,6 @@ smtp_connect(struct smtp *const smtp,
   }
 
   freeaddrinfo(res0);
-
   if(smtp->sock < 0){
     return -1;
   }
@@ -3585,4 +3543,3 @@ smtp_attachment_clear_all(struct smtp *const smtp){
   smtp->attachment_list = NULL;
   smtp->num_attachment = 0;
 }
-
