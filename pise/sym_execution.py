@@ -74,6 +74,7 @@ class QueryRunner:
         ms_time = time.process_time_ns() - t
         if final_stash in sm.stashes.keys() and len(getattr(sm, final_stash)) > 0:
             logger.info('Membership is true - probing')
+            logger.info('We have %d states for probing' % len(sm.stashes[final_stash]))
 
             t = time.process_time_ns()
             # Wait for all states to probe
@@ -84,17 +85,27 @@ class QueryRunner:
 
             # Collect all probed symbols from states that done probing
             if 'probing_done' in sm.stashes.keys():
+                logger.info('%d states have done probing' % len(sm.probing_done))
                 for s in sm.probing_done:
                     if s.query.probed_symbol is not None:
                         new_symbols.append(s.query.probed_symbol)
 
             # Collect pending probes from states that terminated
             for s in sm.deadended:
-                if s.query.probing_pending:
+                if s.query.done_probing:
+                    new_symbols.append(s.query.probed_symbol)
+                if s.query.probing_pending and s.solver.is_true(s.history.events.hardcopy[-1].objects['exit_code'] == 0):
                     s.query.collect_pending_probe()
                     if s.query.probed_symbol is not None:
                         new_symbols.append(s.query.probed_symbol)
-            # print(new_symbols)
+
+            for s in sm.unsat:
+                if s.query.done_probing:
+                    logger.debug('UNSAT %s done probing: %s' % (s, s.query.probed_symbol))
+                if s.query.probing_pending:
+                    logger.debug('UNSAT %s probing pending' % (s))
+
+            logger.info('Probing phase finished, found symbols: %s' % new_symbols)
 
             # Put probing result in probing cache
             self.probing_cache.insert(inputs, new_symbols)
