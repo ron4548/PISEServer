@@ -7,7 +7,7 @@ PISE (Protocol Inference with Symbolic Execution) is a tool that leverages symbo
 
 #### Dependencies
 
-- angr
+- [angr](https://github.com/angr/angr)
 
 
 #### Setup
@@ -23,8 +23,9 @@ We recommend working with virtual environments, as angr recommends doing so:
 
 ```shell
 python -m venv ./venv
-source ./venv/bin/activate
 ```
+
+Then simply run `source ./venv/bin/activate`(linux) or `venv\Scripts\activate.bat` (Windows) to enter the virtual environment.
 
 Now install all the required python packages:
 
@@ -41,23 +42,27 @@ We demonstrate the application of the tool on a toy client we provide (`examples
 1. First we need to identify the addresses (or names) of the functions that send/receive messages within the executable. They can be as low-level as libc's `send` and `receive`, or possibly a more abstract function like `send_message` or `receive_message`. The key part here is to identify where are the message buffer and its length are stored within the program state, as well as what is the return value that indicates a successful send/receive of a message. We suggest doing so with a disassembler tool, like IDA.
    In our toy example we simply hook libc's `send` and `receive` functions.
 
-2. Create a class to hook every function identified in (1). This class should implement the interface `Hook` that contains 3 methods:
+2. Create a class to describe every function identified in (1). This class should implement the interface `SendReceiveCallSite` that contains 3 methods:
 
    ```python
-   class Hook:
+   # This interface describes a callsite that sends/receive messages in the binary, and therefore should be hooked
+   class SendReceiveCallSite:
        # This function should set the hook within the symbolic execution engine
        # In our case it gets the angr project with the executable loaded
-       def set_hook(self, p):
-           raise NotImplementedError()
-   	
-       # This function should extract the buffer pointer and the buffer length from the program state
-       # It is given an instance of SimProcedure, which contains under hooker.state the program state
-       def extract_arguments(self, hooker):
+       # Return value is ignored
+       def set_hook(self, angr_project):
            raise NotImplementedError()
    
-       # This function should return the suitable return address to simulate a successful send or receive
-       # It is given the buffer, the length and the hooker (which contains the state)
-       def get_return_value(self, buffer, length, hooker=None):
+       # This function should extract the buffer pointer and the buffer length from the program state
+       # It is given the call_context as angr's SimProcedure instance, which contains under call_context.state the program state
+       # Should return: (buffer, length) tuple
+       def extract_arguments(self, call_context):
+           raise NotImplementedError()
+   
+       # This function should return the suitable return value to simulate a successful send or receive from the callsite
+       # It is given the buffer, the length and the call_context (which contains the state)
+       # Should return: the return value that will be passed to the caller
+       def get_return_value(self, buffer, length, call_context):
            raise NotImplementedError()
    ```
 
@@ -69,35 +74,36 @@ We demonstrate the application of the tool on a toy client we provide (`examples
    # Hook libc's send function
    # The first argument is the buffer, the second argument is its length.
    # The return value should be simply the length of the buffer
-   class ToySendHook(hooks.Hook):
-       def get_return_value(self, buff, length):
-           return length
+   class ToySendHook(hooks.SendReceiveCallSite):
+       def get_return_value(self, buff, length, call_context):
+           # Something messed up with angr return value handling, so we simply set rax with the desired return value
+           call_context.state.regs.rax = length
    
        def set_hook(self, p):
            p.hook_symbol('send', hooks.SendHook(self))
    
-       def extract_arguments(self, hooker):
-           # This send function uses the standard UNIX calling convention for x86
-           length = hooker.state.regs.edx
-           buffer = hooker.state.regs.rsi
+       def extract_arguments(self, call_context):
+           length = call_context.state.regs.edx
+           buffer = call_context.state.regs.rsi
            return buffer, length
    
    # Hook libc's receive function
    # The first argument is the buffer, the second argument is its length.
    # The return value should be simply the length of the buffer
-   class ToyRecvHook(hooks.Hook):
-       def get_return_value(self, buff, length):
-           return length
+   class ToyRecvHook(hooks.SendReceiveCallSite):
+       def get_return_value(self, buff, length, call_context):
+           # Something messed up with angr return value handling, so we simply set rax with the desired return value
+           call_context.state.regs.rax = length
    
        def set_hook(self, p):
            p.hook_symbol('recv', hooks.RecvHook(self))
    
-       def extract_arguments(self, hooker):
-           length = hooker.state.regs.edx
-           buffer = hooker.state.regs.rsi
+       def extract_arguments(self, call_context):
+           length = call_context.state.regs.edx
+           buffer = call_context.state.regs.rsi
            return buffer, length
    ```
-
+   
 3. Finally, we should setup a query runner and a server to use that query runner. In our example it looks like:
 
    ```python
@@ -105,8 +111,11 @@ We demonstrate the application of the tool on a toy client we provide (`examples
    server.Server(query_runner).listen()
    ```
 
+   where `toy_example` is the binary to work with, and `[ToySendHook(), ToyRecvHook()]` is a list of call sites that should be hooked. The server simply gets a query runner for which it passes the queries, and listens for a learner to connect.
+   
    The server will start up, and listen on port 8080, ready to process queries from the learner module.
-   The server for our toy example can be simply started with `python -m examples.toy_example.toy_client_inference`.
+
+The server for our toy example can be simply started with `python -m examples.toy_example.toy_client_inference`. Once your server is running, you are ready to start the learner.
 
 ## Talks & Paper
 
