@@ -3,33 +3,33 @@ import logging
 from pise import sym_execution, server, hooks
 
 
-class ToySendHook(hooks.Hook):
+class ToySendHook(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         # Something messed up with angr return value handling, so we simply set rax with the desired return value
-        hooker.state.regs.rax = length
+        call_context.state.regs.rax = length
 
     def set_hook(self, p):
         p.hook_symbol('send', hooks.SendHook(self))
 
-    def extract_arguments(self, hooker):
-        length = hooker.state.regs.edx
-        buffer = hooker.state.regs.rsi
+    def extract_arguments(self, call_context):
+        length = call_context.state.regs.edx
+        buffer = call_context.state.regs.rsi
         return buffer, length
 
 
-class ToyRecvHook(hooks.Hook):
+class ToyRecvHook(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         # Something messed up with angr return value handling, so we simply set rax with the desired return value
-        hooker.state.regs.rax = length
+        call_context.state.regs.rax = length
 
     def set_hook(self, p):
         p.hook_symbol('recv', hooks.RecvHook(self))
 
-    def extract_arguments(self, hooker):
-        length = hooker.state.regs.edx
-        buffer = hooker.state.regs.rsi
+    def extract_arguments(self, call_context):
+        length = call_context.state.regs.edx
+        buffer = call_context.state.regs.rsi
         return buffer, length
 
 

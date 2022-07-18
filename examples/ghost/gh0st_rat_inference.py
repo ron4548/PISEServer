@@ -3,31 +3,31 @@ import logging
 from angr import SimProcedure
 from pise import sym_execution, server, hooks
 
-class Gh0stSendHook(hooks.Hook):
+class Gh0stSendCallsite(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         return 0
 
-    def set_hook(self, p):
-        p.hook_symbol('send_message', hooks.SendHook(self))
+    def set_hook(self, project):
+        project.hook_symbol('send_message', hooks.SendHook(self))
 
-    def extract_arguments(self, hooker):
-        length = hooker.state.regs.rsi
-        buffer = hooker.state.regs.rdi
+    def extract_arguments(self, call_context):
+        length = call_context.state.regs.rsi
+        buffer = call_context.state.regs.rdi
         return buffer, length
 
 
-class Gh0stRecvHook(hooks.Hook):
+class Gh0stRecvHook(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         pass
 
     def set_hook(self, p):
         p.hook_symbol('get_message', hooks.RecvHook(self))
 
-    def extract_arguments(self, hooker):
-        length = hooker.state.regs.rsi
-        buffer = hooker.state.regs.rdi
+    def extract_arguments(self, call_context):
+        length = call_context.state.regs.rsi
+        buffer = call_context.state.regs.rdi
         return buffer, length
 
 
@@ -38,14 +38,14 @@ class HasMsgSimProc(SimProcedure):
         self.state.regs.eax = retval
 
 
-class HasMsgHook(hooks.Hook):
-    def get_return_value(self, buff, length, hooker=None):
+class HasMsgHook(hooks.SendReceiveCallSite):
+    def get_return_value(self, buff, length, call_context=None):
         pass
 
     def set_hook(self, p):
         p.hook_symbol('has_message', HasMsgSimProc())
 
-    def extract_arguments(self, hooker):
+    def extract_arguments(self, call_context):
         pass
 
 

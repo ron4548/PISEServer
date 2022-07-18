@@ -9,32 +9,32 @@ logger = logging.getLogger(__name__)
 
 
 # TODO: make this work
-class ToySendHook(hooks.Hook):
+class ToySendHook(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         return length
 
     def set_hook(self, p):
         # p.hook(0x1180, hooks.SendHook(self))
         p.hook_symbol('sendString', hooks.SendHook(self))
 
-    def extract_arguments(self, hooker):
-        buffer = hooker.state.regs.rdi
-        length = hooker.inline_call(angr.SIM_PROCEDURES['libc']['strlen'], buffer).ret_expr
+    def extract_arguments(self, call_context):
+        buffer = call_context.state.regs.rdi
+        length = call_context.inline_call(angr.SIM_PROCEDURES['libc']['strlen'], buffer).ret_expr
         return buffer, length
 
 
-class ToyAsyncRecvHook(hooks.Hook):
+class ToyAsyncRecvHook(hooks.SendReceiveCallSite):
 
-    def get_return_value(self, buff, length, hooker):
+    def get_return_value(self, buff, length, call_context):
         return length
 
     def set_hook(self, p):
         p.hook_symbol('recvAux', RecvHook())
 
-    def extract_arguments(self, hooker):
-        length = hooker.state.regs.edx
-        buffer = hooker.state.regs.rdi
+    def extract_arguments(self, call_context):
+        length = call_context.state.regs.edx
+        buffer = call_context.state.regs.rdi
         return buffer, length
 
 

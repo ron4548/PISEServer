@@ -11,11 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class QueryRunner:
-    def __init__(self, file, hookers):
+    def __init__(self, file, callsites_to_monitor):
         self.file = file
         self.project = angr.Project(file, auto_load_libs=False)
         self.mode = None
-        self.hookers = hookers
+        self.callsites_to_monitor = callsites_to_monitor
         self.set_membership_hooks()
         self.cache = SimulationCache()
         self.probing_cache = ProbingCache()
@@ -122,8 +122,8 @@ class QueryRunner:
         if self.mode == 'membership':
             return
         logger.info('Setting hooks')
-        for hook in self.hookers:
-            hook.set_hook(self.project)
+        for callsite in self.callsites_to_monitor:
+            callsite.set_hook(self.project)
         self.mode = 'membership'
 
 
