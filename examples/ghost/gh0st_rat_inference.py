@@ -5,7 +5,7 @@ from pise import sym_execution, server, hooks
 
 class Gh0stSendHook(hooks.Hook):
 
-    def get_return_value(self, buff, length, hooker=None):
+    def get_return_value(self, buff, length, hooker):
         return 0
 
     def set_hook(self, p):
@@ -19,7 +19,7 @@ class Gh0stSendHook(hooks.Hook):
 
 class Gh0stRecvHook(hooks.Hook):
 
-    def get_return_value(self, buff, length, hooker=None):
+    def get_return_value(self, buff, length, hooker):
         pass
 
     def set_hook(self, p):

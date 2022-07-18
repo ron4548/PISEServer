@@ -6,7 +6,7 @@ from pise import sym_execution, server, hooks
 
 class SmtpSendHook(hooks.Hook):
 
-    def get_return_value(self, buff, length):
+    def get_return_value(self, buff, length, hooker):
         return 0
 
     def set_hook(self, p):

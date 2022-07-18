@@ -28,7 +28,7 @@ class SendHook(SimProcedure):
         length = self.state.solver.eval(length_arg)
         logger.debug('Send hook with %d bytes, buff = %s' % (length, buffer_arg))
         self.state.query.handle_send(buffer_arg, length)
-        return self.hooker.get_return_value(buffer_arg, length_arg)
+        return self.hooker.get_return_value(buffer_arg, length_arg, hooker=self)
 
 
 class Hook:

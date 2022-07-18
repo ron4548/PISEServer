@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 # TODO: make this work
 class ToySendHook(hooks.Hook):
 
-    def get_return_value(self, buff, length):
+    def get_return_value(self, buff, length, hooker):
         return length
 
     def set_hook(self, p):
@@ -26,7 +26,7 @@ class ToySendHook(hooks.Hook):
 
 class ToyAsyncRecvHook(hooks.Hook):
 
-    def get_return_value(self, buff, length):
+    def get_return_value(self, buff, length, hooker):
         return length
 
     def set_hook(self, p):
@@ -51,7 +51,7 @@ class RecvHook(SimProcedure):
         logger.debug('Async recv hook, making up some message')
         self.state.query.handle_recv(buffer_arg, length)
         addr = self.state.project.loader.find_symbol('onMessageReceived').rebased_addr
-        self.call(addr=addr, args=(buffer_arg, length), continue_at='cont')
+        self.call(addr=addr, args=(buffer_arg, length), continue_at='cont', prototype='int f(char*, int)')
 
     def cont(self):
         return self.state.regs.al
@@ -59,7 +59,7 @@ class RecvHook(SimProcedure):
 
 def main():
     logging.getLogger('pise').setLevel(logging.DEBUG)
-    query_runner = sym_execution.QueryRunner('toy_example_async', [ToySendHook(), ToyAsyncRecvHook()])
+    query_runner = sym_execution.QueryRunner('examples/toy_example_async/toy_example_async', [ToySendHook(), ToyAsyncRecvHook()])
     s = server.Server(query_runner)
     s.listen()
 
