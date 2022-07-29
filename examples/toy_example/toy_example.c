@@ -9,12 +9,10 @@
 
 #define PORT 8080
 #define LOGIN       "login"
-#define OK1         "ok1"
-#define OK2         "ok2"
-#define LOGOUT1     "logout1"
-#define LOGOUT2     "logout2"
-#define BLOOP       "bloop"
-#define FOUND       "yeah, you found me!"
+#define OK          "ok"
+#define DATA        "data"
+#define ABORT       "abort"
+#define FOUND       "backdoor is found!"
 
 int main(int argc, char *argv[]) {
     int sock = 0;
@@ -50,25 +48,34 @@ int main(int argc, char *argv[]) {
     send(sock, send_buff, strlen(LOGIN) + sizeof(int) + 1, 0);
     int backdoorCounter = 0;
     while (1) {
+        unsigned int length = 0;
         //    hexdump(buffer, 64);
 
         // Read number
         scanf("%d", &magic_number);
 
         if (magic_number > 5) {
-            send(sock, BLOOP, strlen(BLOOP), 0);
+            send(sock, ABORT, strlen(ABORT), 0);
             break;
         }
 
-        recv(sock, buffer, 64, 0);
-        if (strcmp(buffer, OK1) == 0) {
-            send(sock, LOGOUT1, strlen(LOGOUT1), 0);
+        recv(sock, buffer, length, 0);
+        if (strcmp(buffer, OK) != 0) { break; }
+        
+        memcpy(send_buff, DATA, strlen(DATA));
 
-        } else if (strcmp(buffer, OK2) == 0) {
-            send(sock, LOGOUT2, strlen(LOGOUT2), 0);
-            if (backdoorCounter++ == 3) {
+        int* version = (int*)&buffer[3];
+        if (*version == 1) {
+            *(int*)&send_buff[strlen(DATA)] = *version;
+            send(sock, send_buff, strlen(DATA), 0);
+        } else if (*version == 2) {
+            *(int*)&send_buff[strlen(DATA)] = *version;
+            send(sock, send_buff, strlen(DATA), 0);
+
+            if (backdoorCounter++ == 2) {
                 send(sock, FOUND, strlen(FOUND), 0);
             }
+
         } else {
             printf("\nError: %s\n", buffer);
             break;
