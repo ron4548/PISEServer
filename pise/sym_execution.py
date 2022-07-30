@@ -94,7 +94,9 @@ class QueryRunner:
             for s in sm.deadended:
                 if s.query.done_probing:
                     new_symbols.append(s.query.probed_symbol)
+                    logger.debug('deadended done probing')
                 if s.query.probing_pending and s.solver.is_true(s.history.events.hardcopy[-1].objects['exit_code'] == 0):
+                    logger.debug('deadended pending probing with exit code: %s' % s.history.events.hardcopy[-1].objects['exit_code'])
                     s.query.collect_pending_probe()
                     if s.query.probed_symbol is not None:
                         new_symbols.append(s.query.probed_symbol)
