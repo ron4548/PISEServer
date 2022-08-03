@@ -48,7 +48,6 @@ int main(int argc, char *argv[]) {
     send(sock, send_buff, strlen(LOGIN) + sizeof(int) + 1, 0);
     int backdoorCounter = 0;
     while (1) {
-        unsigned int length = 0;
         //    hexdump(buffer, 64);
 
         // Read number
@@ -59,30 +58,32 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        recv(sock, buffer, length, 0);
-        if (strcmp(buffer, OK) != 0) { break; }
-        
-        memcpy(send_buff, DATA, strlen(DATA));
+        recv(sock, buffer, sizeof(buffer), 0);
+        if (strcmp(buffer, OK) != 0) { close(sock); exit(-1); }
 
-        int* version = (int*)&buffer[3];
+        memset(send_buff, 0, sizeof(send_buff));
+        memcpy(send_buff, DATA, strlen(DATA) + 1);
+
+        int* version = (int*)&buffer[strlen(OK) + 1];
         if (*version == 1) {
-            *(int*)&send_buff[strlen(DATA)] = *version;
-            send(sock, send_buff, strlen(DATA), 0);
+            *(int*)&send_buff[strlen(DATA) + 1] = *version;
+            send(sock, send_buff, strlen(DATA) + sizeof(int) + 1, 0);
         } else if (*version == 2) {
-            *(int*)&send_buff[strlen(DATA)] = *version;
-            send(sock, send_buff, strlen(DATA), 0);
+            *(int*)&send_buff[strlen(DATA) + 1] = *version;
+            send(sock, send_buff, strlen(DATA) + sizeof(int) + 1, 0);
 
             if (backdoorCounter++ == 2) {
-                send(sock, FOUND, strlen(FOUND), 0);
+                send(sock, FOUND, strlen(FOUND) + 1, 0);
             }
 
         } else {
             printf("\nError: %s\n", buffer);
-            break;
+            close(sock);
+            exit(-1);
         }
     }
 
     close(sock);
 
-    return 0;
+    exit(0);
 }
