@@ -3,7 +3,7 @@ import logging
 from angr import SimProcedure
 from pise import sym_execution, server, hooks
 
-class Gh0stSendCallsite(hooks.SendReceiveCallSite):
+class Gh0stSendHook(hooks.SendReceiveCallSite):
 
     def get_return_value(self, buff, length, call_context):
         return 0

@@ -148,11 +148,13 @@ void do_screen_spy() {
     buffer[0] = TOKEN_FIRSTSCREEN;
     sprintf((char*)&buffer[1], "%s", "first screen");
     send_message((void*)buffer,  1 + strlen("first screen"));
-    while (has_message()) {
+    while (true) {
         while (has_message()){
+            memset(buffer, 0, sizeof(buffer));
             get_message(buffer, sizeof(buffer));
             switch (buffer[0]) {
                 case COMMAND_SCREEN_GET_CLIPBOARD:
+                    memset(buffer, 0, sizeof(buffer));
                     buffer[0] = TOKEN_CLIPBOARD_TEXT;
                     sprintf((char*)&buffer[1], "%s", "clipboard text");
                     send_message(buffer, 1 + strlen("clipboard text"));
@@ -165,6 +167,9 @@ void do_screen_spy() {
                 break;
                 case COMMAND_SCREEN_CONTROL:
                     printf("control command");
+                break;
+                default:
+                    exit(-1);
                 break;
             }
         }
@@ -550,7 +555,7 @@ void do_regedit() {
     buffer[0] = TOKEN_REGEDIT;
     send_message(buffer, 1);
 
-    while (has_message()) {
+    while (true) {
         get_message(buffer, sizeof(buffer));
         if (buffer[0] == COMMAND_REG_FIND) {
             printf("register operation..");
@@ -655,6 +660,8 @@ void doGh0st() {
         exit(-1);
         break;
     }
+
+    exit(-1);
 }
 
 
