@@ -7,10 +7,12 @@ PISE (Protocol Inference with Symbolic Execution) is a tool that leverages symbo
 
 #### Dependencies
 
-- [angr](https://github.com/angr/angr)
+- [angr](https://github.com/angr/angr) - symbolic execution engine
+- [PISEClient](https://github.com/ron4548/PISEClient) - the module that performs the actual learning ("Learner")
+- Python - 3.8+
 
 
-#### Setup
+#### Installation
 
 In order to start working with PISE, first clone this repo:
 
@@ -35,9 +37,25 @@ pip install -r requirements.txt
 
 And you are done.
 
-#### Applying the method on a toy example
+### Running PISE on the provided Gh0st RAT example
 
-We demonstrate the application of the tool on a toy client we provide (`examples/toy_example/toy_example.c`). You can compile this example by execution `cd examples/toy_example && make`.
+1. Make sure you have installed [PISEClient](https://github.com/ron4548/PISEClient).
+2. Start a PISE server instance for the Gh0st RAT example: `python -m examples.ghost.gh0st_rat_inference`. Wait for the server to load the binary and set hooks.
+3. Start a PISE learner instance by running `mvn exec:java -Dexec.mainClass="org.example.learnlib.PiseLearner"`. PISE will now run.
+4. While PISE is running, you will be able to see a snapshot of the currently learned state machine in `PISEClient/out/snapshot.dot.png` and the currently known message types in `PISEClient/out/snapshot_alphabet.txt`.
+5. When the learning is done, the learned state machine will be available in `PISEClient/out/final_graph.dot.png` and the final set of message types in `PISEClient/out/final_alphabet.txt`.
+
+![](https://github.com/ron4548/PISEServer/blob/master/examples/ghost/ghost_rat_graph.png?raw=true)
+
+#### Demo Video
+
+[![PISE demo video](https://img.youtube.com/vi/IcXyg0Mc13E/0.jpg)](https://www.youtube.com/watch?v=IcXyg0Mc13E)
+
+https://youtu.be/IcXyg0Mc13E
+
+#### Applying the method on a binary
+
+We demonstrate the application of the tool on a toy client we provide (`examples/toy_example/toy_example`). Alternatively, You can compile this example by executing `cd examples/toy_example && make && cd ../..`. **We recommend that you use the binary we provide to avoid issues with the extraction of the message buffer and length.** The code that starts a server for the toy example already exists in `examples/toy_example/toy_client_inference.py`.
 
 1. First we need to identify the addresses (or names) of the functions that send/receive messages within the executable. They can be as low-level as libc's `send` and `receive`, or possibly a more abstract function like `send_message` or `receive_message`. The key part here is to identify where are the message buffer and its length are stored within the program state, as well as what is the return value that indicates a successful send/receive of a message. We suggest doing so with a disassembler tool, like IDA.
    In our toy example we simply hook libc's `send` and `receive` functions.
