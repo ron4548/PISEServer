@@ -41,7 +41,7 @@ And you are done.
 
 1. Make sure you have installed [PISEClient](https://github.com/ron4548/PISEClient).
 2. Start a PISE server instance for the Gh0st RAT example: `python -m examples.ghost.gh0st_rat_inference`. Wait for the server to load the binary and set hooks.
-3. Start a PISE learner instance by running `mvn exec:java -Dexec.mainClass="org.example.learnlib.PiseLearner"`. PISE will now run.
+3. Start a PISE learner instance by running `mvn exec:java -Dexec.mainClass="com.pise.client.PiseLearner"`. PISE will now run.
 4. While PISE is running, you will be able to see a snapshot of the currently learned state machine in `PISEClient/out/snapshot.dot.png` and the currently known message types in `PISEClient/out/snapshot_alphabet.txt`.
 5. When the learning is done, the learned state machine will be available in `PISEClient/out/final_graph.dot.png` and the final set of message types in `PISEClient/out/final_alphabet.txt`.
 
