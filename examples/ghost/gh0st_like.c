@@ -540,6 +540,8 @@ void do_audio() {
             get_message(buffer, sizeof(buffer));
             if (buffer[0] == COMMAND_AUDIO) {
                 printf("play audio");
+            } else {
+                exit(-1);
             }
         }
 

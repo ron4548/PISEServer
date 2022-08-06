@@ -72,50 +72,57 @@ class QueryRunner:
 
         final_stash = "position_%d" % len(inputs)
         ms_time = time.process_time_ns() - t
-        if final_stash in sm.stashes.keys() and len(getattr(sm, final_stash)) > 0:
-            logger.info('Membership is true - probing')
-            logger.info('We have %d states for probing' % len(sm.stashes[final_stash]))
+        if final_stash not in sm.stashes.keys() or len(getattr(sm, final_stash)) == 0:
+            # the membership query resulted False
+            # TODO: understand if we ever get here at all. Does probing cache always prevents us from getting here?
+            return False, None, ms_time, None, None
+        
+        # Probing phase
+        logger.info('Membership is true - probing')
+        logger.info('We have %d states for probing' % len(sm.stashes[final_stash]))
 
-            t = time.process_time_ns()
-            # Wait for all states to probe
-            sm.run(stash=final_stash, filter_func=lambda sl: 'probing_done' if sl.query.done_probing else None)
-            probe_time = time.process_time_ns() - t
+        t = time.process_time_ns()
+        # Wait for all states to probe
+        sm.run(stash=final_stash, filter_func=lambda sl: 'probing_done' if sl.query.done_probing else None)
+        probe_time = time.process_time_ns() - t
 
-            new_symbols = []
+        # TODO: handle this case better: the last message type in the sequence is of type RECEIVE
+        # For now, we simply say that if the probing phase yields no results then we carefully assume that the sequence is not valid.
+        if len(inputs) > 0 and inputs[len(inputs)-1].type == 'RECEIVE' and ('probing_done' not in sm.stashes.keys() or len(sm.probing_done) == 0):
+            logger.info('Query with last symbol recevied is False')
+            return False, None, ms_time, None, None
 
-            # Collect all probed symbols from states that done probing
-            if 'probing_done' in sm.stashes.keys():
-                logger.info('%d states have done probing' % len(sm.probing_done))
-                for s in sm.probing_done:
-                    if s.query.probed_symbol is not None:
-                        new_symbols.append(s.query.probed_symbol)
+        new_symbols = []
 
-            # Collect pending probes from states that terminated
-            for s in sm.deadended:
-                if s.query.done_probing:
+        # Collect all probed symbols from states that done probing
+        if 'probing_done' in sm.stashes.keys():
+            logger.info('%d states have done probing' % len(sm.probing_done))
+            for s in sm.probing_done:
+                if s.query.probed_symbol is not None:
                     new_symbols.append(s.query.probed_symbol)
-                    logger.debug('deadended done probing')
-                if s.query.probing_pending and s.solver.is_true(s.history.events.hardcopy[-1].objects['exit_code'] == 0):
-                    logger.debug('deadended pending probing with exit code: %s' % s.history.events.hardcopy[-1].objects['exit_code'])
-                    s.query.collect_pending_probe()
-                    if s.query.probed_symbol is not None:
-                        new_symbols.append(s.query.probed_symbol)
 
-            for s in sm.unsat:
-                if s.query.done_probing:
-                    logger.debug('UNSAT %s done probing: %s' % (s, s.query.probed_symbol))
-                if s.query.probing_pending:
-                    logger.debug('UNSAT %s probing pending' % (s))
+        # Collect pending probes from states that terminated
+        for s in sm.deadended:
+            if s.query.done_probing:
+                new_symbols.append(s.query.probed_symbol)
+                logger.debug('deadended done probing')
+            if s.query.probing_pending and s.solver.is_true(s.history.events.hardcopy[-1].objects['exit_code'] == 0):
+                logger.debug('deadended pending probing with exit code: %s' % s.history.events.hardcopy[-1].objects['exit_code'])
+                s.query.collect_pending_probe()
+                if s.query.probed_symbol is not None:
+                    new_symbols.append(s.query.probed_symbol)
 
-            logger.info('Probing phase finished, found symbols: %s' % new_symbols)
+        for s in sm.unsat:
+            if s.query.done_probing:
+                logger.debug('UNSAT %s done probing: %s' % (s, s.query.probed_symbol))
+            if s.query.probing_pending:
+                logger.debug('UNSAT %s probing pending' % (s))
 
-            # Put probing result in probing cache
-            self.probing_cache.insert(inputs, new_symbols)
-            return True, [sym.__dict__ for sym in new_symbols], ms_time, 0, probe_time
+        logger.info('Probing phase finished, found symbols: %s' % new_symbols)
 
-        # Otherwise, the membership query resulted False
-        # TODO: understand if we ever get here at all. Does probing cache always prevents us from getting here?
-        return False, None, ms_time, None, None
+        # Put probing result in probing cache
+        self.probing_cache.insert(inputs, new_symbols)
+        return True, [sym.__dict__ for sym in new_symbols], ms_time, 0, probe_time
 
     def clear_cache(self):
         self.cache = SimulationCache()
