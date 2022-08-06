@@ -1,5 +1,4 @@
 import logging
-from collections import Sequence
 
 from pise.entities import MessageTypeSymbol
 
